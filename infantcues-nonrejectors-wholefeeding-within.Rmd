@@ -1,0 +1,324 @@
+---
+title: 'Infant Cues - Within Dyad - Non-rejectors only'
+author: ""
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+FIX TO DO TOTAL NUMBER OF CUES BOTH WITH AND WITHOUT CRYING/EYES-CLOSED
+
+
+```{r setup, include=FALSE}
+source("shared_setup.R")
+```
+
+
+```{r}
+
+data_dyad_total_cues <- data_dyad_total_zeros %>%
+  filter(dyad_unit == "Baby") %>%
+  filter(!(Behavior %in% c("Eyes Open", "Not Crying"))) %>%
+  group_by(dyad_set, id) %>%
+  summarize(Bottle_Rejector = first(Bottle_Rejector),
+            num_cues = sum(num_occurrences),
+            num_types = n_distinct(Behavior[num_occurrences > 0]),
+            num_cues_per_length = sum(num_per_length),
+            num_cues_per_min = sum(num_per_min),
+            video_length = max(video_length)) %>%
+  mutate(num_types_per_length = num_types / video_length,
+         num_types_per_min = num_types_per_length * 60)
+
+```
+
+
+
+# Feeding length
+
+
+```{r}
+
+data_dyad_total_cues_selected <- data_dyad_total_zeros %>%
+  group_by(dyad_set, id) %>%
+  filter(video_length == max(video_length)) %>%
+  filter(row_number() == 1) %>%
+  ungroup() %>%
+  group_by(id) %>%
+  mutate(max_value = max(video_length),
+         min_value = min(video_length),
+         range_value = max_value - min_value) %>%
+  mutate(num_ages = n()) %>%
+  ungroup() %>%
+  mutate(id = fct_reorder(id, min_value)) %>%
+  mutate(id = fct_reorder(id, range_value))
+
+
+for (age in 1:n_time_points) {
+  p <- ggplot(data_dyad_total_cues_selected %>%
+                filter(num_ages == age),
+              aes(x = id, y = video_length, color = dyad_set, shape = dyad_set)) +
+    geom_point() +
+    ggtitle(paste("Dyads observed at", age, "ages")) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    labs(y = "Feeding length (sec)") +
+    ylim(0, max(data_dyad_total_cues_selected$video_length))
+  print(p)
+}
+
+```
+
+
+```{r}
+
+pd <- position_dodge(0.4)
+
+ggplot(data_dyad_total_cues_selected,
+       aes(x = dyad_set, y = video_length, group = id, color = as_factor(num_ages))) +
+  geom_line(alpha = 0.2, position = pd) +
+  geom_point(position = pd) +
+  labs(y = "Feeding length (sec)",
+       x = "age", 
+       color = "Number of ages")
+```
+
+# Total number of cues, excluding Crying and Eyes Closed
+
+
+```{r}
+
+data_dyad_total_cues_selected <- data_dyad_total_cues %>%
+  group_by(id) %>%
+  mutate(max_value = max(num_cues),
+         min_value = min(num_cues),
+         range_value = max_value - min_value) %>%
+  mutate(num_ages = n()) %>%
+  ungroup() %>%
+  mutate(id = fct_reorder(id, min_value)) %>%
+  mutate(id = fct_reorder(id, range_value))
+
+
+for (age in 1:n_time_points) {
+  p <- ggplot(data_dyad_total_cues_selected %>%
+             filter(num_ages == age),
+           aes(x = id, y = num_cues, color = dyad_set, shape = dyad_set)) +
+      geom_point() +
+      ggtitle(paste("Dyads observed at", age, "ages")) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    labs(y = "Total number of cues")  +
+    ylim(0, max(data_dyad_total_cues_selected$num_cues))
+  print(p)
+}
+
+```
+
+
+
+```{r}
+
+pd <- position_dodge(0.4)
+
+ggplot(data_dyad_total_cues_selected,
+       aes(x = dyad_set, y = num_cues, group = id, color = as_factor(num_ages))) +
+  geom_line(alpha = 0.2, position = pd) +
+  geom_point(position = pd) +
+  labs(y = "Total number of cues",
+       x = "age", 
+       color = "Number of ages")
+```
+
+
+# Total number of cues per length (min) of feeding
+
+
+```{r}
+
+data_dyad_total_cues_selected <- data_dyad_total_cues %>%
+  group_by(id) %>%
+  mutate(max_value = max(num_cues_per_min),
+         min_value = min(num_cues_per_min),
+         range_value = max_value - min_value) %>%
+  mutate(num_ages = n()) %>%
+  ungroup() %>%
+  mutate(id = fct_reorder(id, min_value)) %>%
+  mutate(id = fct_reorder(id, range_value))
+
+
+for (age in 1:n_time_points) {
+  p <- ggplot(data_dyad_total_cues_selected %>%
+             filter(num_ages == age),
+           aes(x = id, y = num_cues_per_min, color = dyad_set, shape = dyad_set)) +
+      geom_point() +
+      ggtitle(paste("Dyads observed at", age, "ages")) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    labs(y = "Total number of cues, per minute") +
+    ylim(0, max(data_dyad_total_cues_selected$num_cues_per_min))
+  print(p)
+}
+
+```
+
+
+
+```{r}
+
+pd <- position_dodge(0.4)
+
+ggplot(data_dyad_total_cues_selected,
+       aes(x = dyad_set, y = num_cues_per_min, group = id, color = as_factor(num_ages))) +
+  geom_line(alpha = 0.2, position = pd) +
+  geom_point(position = pd) +
+  labs(y = "Total number of cues, per minute",
+       x = "age", 
+       color = "Number of ages")
+```
+
+
+
+# Number of different types of cues
+
+
+
+```{r}
+
+data_dyad_total_cues_selected <- data_dyad_total_cues %>%
+  group_by(id) %>%
+  mutate(max_value = max(num_types),
+         min_value = min(num_types),
+         range_value = max_value - min_value) %>%
+  mutate(num_ages = n()) %>%
+  ungroup() %>%
+  mutate(id = fct_reorder(id, min_value)) %>%
+  mutate(id = fct_reorder(id, range_value))
+
+
+for (age in 1:n_time_points) {
+  p <- ggplot(data_dyad_total_cues_selected %>%
+             filter(num_ages == age),
+           aes(x = id, y = num_types, color = dyad_set, shape = dyad_set)) +
+      geom_point() +
+      ggtitle(paste("Dyads observed at", age, "ages")) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    labs(y = "Number of different types of cues") +
+    ylim(0, max(data_dyad_total_cues_selected$num_types))
+  print(p)
+}
+
+```
+
+
+
+```{r}
+
+pd <- position_dodge(0.4)
+
+ggplot(data_dyad_total_cues_selected,
+       aes(x = dyad_set, y = num_types, group = id, color = as_factor(num_ages))) +
+  geom_line(alpha = 0.2, position = pd) +
+  geom_point(position = pd) +
+  labs(y = "Number of different types of cues",
+       x = "age", 
+       color = "Number of ages")
+```
+
+
+
+# Number of different types of cues, per length (min) of feeding
+
+
+
+```{r}
+
+data_dyad_total_cues_selected <- data_dyad_total_cues %>%
+  group_by(id) %>%
+  mutate(max_value = max(num_types_per_min),
+         min_value = min(num_types_per_min),
+         range_value = max_value - min_value) %>%
+  mutate(num_ages = n()) %>%
+  ungroup() %>%
+  mutate(id = fct_reorder(id, min_value)) %>%
+  mutate(id = fct_reorder(id, range_value))
+
+
+for (age in 2:n_time_points) {
+  p <- ggplot(data_dyad_total_cues_selected %>%
+             filter(num_ages == age),
+           aes(x = id, y = num_types_per_min, color = dyad_set, shape = dyad_set)) +
+      geom_point() +
+      ggtitle(paste("Dyads observed at", age, "ages")) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    labs(y = "Number of different types of cues, per minute") +
+    ylim(0, max(data_dyad_total_cues_selected$num_types_per_min))
+  print(p)
+}
+
+```
+
+
+
+```{r}
+
+pd <- position_dodge(0.4)
+
+ggplot(data_dyad_total_cues_selected,
+       aes(x = dyad_set, y = num_types_per_min, group = id, color = as_factor(num_ages))) +
+  geom_line(alpha = 0.2, position = pd) +
+  geom_point(position = pd) +
+  labs(y = "Number of different types of cues, per minute",
+       x = "age", 
+       color = "Number of ages")
+```
+
+
+
+
+# Individual cues, per length of feeding
+
+```{r}
+
+for (selected_cue in cues) {
+  
+  data_dyad_total_cues_selected <- data_dyad_total_zeros %>%
+    filter(Behavior == selected_cue) %>%
+    group_by(id) %>%
+    mutate(max_value = max(num_per_min),
+           min_value = min(num_per_min),
+           range_value = max_value - min_value) %>%
+    mutate(num_ages = n()) %>%
+    ungroup() %>%
+  mutate(id = fct_reorder(id, min_value)) %>%
+  mutate(id = fct_reorder(id, range_value))
+  
+  
+  for (age in 1:n_time_points) {
+    p <- ggplot(data_dyad_total_cues_selected %>%
+                  filter(num_ages == age),
+                aes(x = id, y = num_per_min, color = dyad_set, shape = dyad_set)) +
+      geom_point() +
+      ggtitle(paste(selected_cue, "Dyads observed at", age, "ages")) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+      labs(y = "Number of cues, per minute") +
+    ylim(0, max(data_dyad_total_cues_selected$num_per_min))
+    print(p)
+  }
+  
+  p2 <- ggplot(data_dyad_total_cues_selected,
+               aes(x = dyad_set, y = num_per_min, group = id, color = as_factor(num_ages))) +
+    geom_line(alpha = 0.2, position = pd) +
+    geom_point(position = pd) +
+    labs(y = "Number of cues, per minute",
+         x = "age", 
+         color = "Number of ages")  +
+          ggtitle(selected_cue) 
+  
+  print(p2)
+  
+}
+
+```
+
+
+
+# END
+
+```{r}
+knitr::knit_exit()
+```

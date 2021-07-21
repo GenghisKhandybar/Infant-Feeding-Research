@@ -1,0 +1,352 @@
+---
+title: "Infant-Final-Cues"
+author: "William Medwid"
+date: "6/30/2021"
+output: 
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+# Analysis of the last cues an infant gives before feeding ends.
+
+```{r setup, include=FALSE}
+source("shared_setup.R")
+```
+
+```{r final_cues}
+final_cue <- data_duration %>% 
+  filter(dyad_unit == "Baby") %>% 
+  filter(Grouped_behavior == "Infant Satiation Cues") %>% 
+  group_by(id, dyad_set) %>% 
+  slice_max(order_by=Time_Relative_sf, n=1) %>% 
+  mutate(time_before_end = video_length - end_time)
+
+last_cue_counts <- final_cue %>% 
+  group_by(dyad_set) %>% 
+  count(Behavior)
+  
+n_dyads <- last_cue_counts %>% group_by(dyad_set) %>% summarise(n_dyads = sum(n))
+
+#Creating proportion variable
+last_cue_counts <- last_cue_counts %>% 
+  left_join(n_dyads,
+    on=dyad_set) %>% 
+  mutate(prop_dyads = n/n_dyads)
+
+# Checksum for proportions
+#last_cue_counts %>% group_by(dyad_set) %>% summarise(n = sum(n), prop_sum = sum(prop_dyads))
+
+#Plot
+
+last_cue_counts %>% 
+  ggplot(aes(y=reorder(Behavior, desc(prop_dyads)), 
+             x=prop_dyads*100, 
+             fill = dyad_set)) +
+  geom_bar(position="dodge", stat="identity") +
+  facet_grid(cols = vars(dyad_set)) +
+  ylab("Final Satiation Cue") +
+  xlab("Percent of final cues") +
+  ggtitle("Final infant cue before end of session")+ 
+  theme(legend.position = "none") #The fill colors are purely aesthetic so the legend is removed.
+```
+
+For the 2 week and 2 month feedings, droolig, spitting out milk, spitting up, as well as negative facial expressions are some of the most common final cues, meaning they are likely good indicators of satiation at those ages. While very rare in the 2 week and 2 month feedings, physical rejection by turning head or body, or pushing the bottle away become the most prevailant final satiation indicators.
+
+## Time of final cues before the feeding ends
+
+```{r final_cue_times}
+final_cue <- data_duration %>% 
+  filter(dyad_unit == "Baby") %>% 
+  filter(Grouped_behavior == "Infant Satiation Cues") %>% 
+  group_by(id, dyad_set) %>% 
+  slice_max(order_by=Time_Relative_sf, n=1) %>% 
+  mutate(time_before_end = video_length - Time_Relative_sf,
+         fraction_before_end = (1-start_fraction)*100)
+
+final_cue <- final_cue %>% left_join( #Adding median times to sort by
+  final_cue %>% 
+    group_by(Behavior) %>% 
+    summarise(med_time = median(time_before_end), 
+              med_frac_time = median(fraction_before_end)),
+  on=c(id,dyad_set)
+)
+par(mfrow=c(2,1))
+
+final_cue %>% ggplot(aes(x=time_before_end, y=reorder(Behavior, med_time))) +
+  geom_boxplot() + 
+  facet_grid(cols = vars(dyad_set)) +
+#  xlim(0, 240) +
+  ylab("Final Satiation Cue") +
+  xlab("Time Before End of Session") +
+  ggtitle("Final cues and their proximity to end of feedings"
+          #, subtitle = "Excluding outliers above 240 seconds"
+          )
+
+final_cue %>% ggplot(aes(x=fraction_before_end, y=reorder(Behavior, med_frac_time))) +
+  geom_boxplot() + 
+  facet_grid(cols = vars(dyad_set)) +
+  #xlim(0, 240) +
+  ylab("Final Satiation Cue") +
+  xlab("Percent of session remainig") +
+  ggtitle("Final cues and their proportional proximity\nto end of feedings"
+          #,subtitle = "Excluding outliers above 240 seconds"
+          )
+
+par(mfrow=c(1,1))
+```
+
+Using the final cues found in the previous plot, this plot shows how close to the end each infant's final cue is. Eyes closed, crying, and not opening the mouth tends to end the feeding quickly, while gags/coughs/chokes and biting/chewing the nipple often happen a longer time before the end.
+
+```{r}
+#Table form - time distribution is skewed so median is more useful than mean
+final_cue %>% 
+  group_by(Behavior) %>% 
+  summarise(
+    min = min(time_before_end),
+    q1 = quantile(time_before_end, 0.25), 
+    median = median(time_before_end), 
+    q3 = quantile(time_before_end, 0.75), 
+    max=max(time_before_end), 
+    mean = mean(time_before_end),
+    sd = sd(time_before_end)
+  ) %>% 
+  arrange(median) %>% 
+  kable(digits=2, caption="Final cues: How long each happens before feeding ends")
+```
+
+This table reflects the previous chart, aggregated over the 4 dyad age groups. The precise mean and median values may have been hard to discern from the plot, so they're shown in the table here.
+
+<!-- ## Frequency of cues within the final 60 seconds -->
+
+<!-- ```{r last_60_sec}  -->
+<!-- #Not included b/c 25% appears better -->
+<!-- proximity_period = 60 -->
+
+<!-- near_final_cues =  data_duration %>%  -->
+<!--   filter(dyad_unit == "Baby") %>%  -->
+<!--   filter(Grouped_behavior == "Infant Satiation Cues") %>%   -->
+<!--   filter(video_length - Time_Relative_sf < proximity_period) %>%  -->
+<!--   distinct(Behavior, dyad_set, id) #Removes repeated cues from the same infant within the same feeding -->
+
+<!-- # Below is copied from final_cues code block -->
+
+<!-- last_cue_counts <- near_final_cues %>%  -->
+<!--   group_by(dyad_set) %>%  -->
+<!--   count(Behavior) -->
+
+<!-- #Creating proportion variable -->
+<!-- last_cue_counts <- last_cue_counts %>%  -->
+<!--   left_join(n_dyads, -->
+<!--             on=dyad_set) %>%  -->
+<!--   mutate(prop_dyads = n/n_dyads) -->
+
+<!-- last_cue_counts %>%  -->
+<!--   ggplot(aes(color=Behavior,  -->
+<!--              group=Behavior, -->
+<!--              y=prop_dyads*100,  -->
+<!--              x = dyad_set)) + -->
+<!--   geom_point() + -->
+<!--   geom_line() + -->
+<!--   ylab("Percent expressing cue") + -->
+<!--   xlab("Dyad set") + -->
+<!--   ggtitle("Infants displaying cues at least once in the final 60 seconds of feeding") -->
+<!-- ``` -->
+
+<!-- Common cues in the last 60 seconds include shaking head, drooling, and pushing bottle away. These may indicate satiation. -->
+
+## Frequency of cues within the last 25% of feeding
+
+```{r last_quarter}
+after_prop = 0.75
+
+near_final_cues =  data_duration %>% 
+  filter(dyad_unit == "Baby") %>% 
+  filter(Grouped_behavior == "Infant Satiation Cues") %>%  
+  #filter(Event_Type == "State point") %>% 
+  filter(start_fraction > after_prop) %>% 
+  distinct(Behavior, dyad_set, id) #Removes repeated cues from the same infant within the same feeding
+
+last_cue_counts <- near_final_cues %>% 
+  group_by(dyad_set) %>% 
+  count(Behavior)
+  
+#Creating proportion variable
+last_cue_counts <- last_cue_counts %>% 
+  left_join(n_dyads,
+            on=dyad_set) %>% 
+  mutate(prop_dyads = n/n_dyads,
+         Behavior = reorder(Behavior, desc(prop_dyads)))
+
+# Table -----------
+
+verbose_props <- last_cue_counts %>% 
+  mutate(prop_dyads_verbose = paste(
+    round(prop_dyads, 2) %>% str_pad(width=4, side="right", pad="0"),
+    " (", n, "/", n_dyads, ")", sep = "")) %>% 
+  pivot_wider(names_from = dyad_set, 
+              values_from = prop_dyads_verbose, 
+              id_cols = Behavior)
+verbose_props %>% 
+  arrange(verbose_props %>% select("6moB")) %>% 
+  kable(caption="Proportion of infants displaying each cue in the last 25% of feeding")
+
+# Plot ----------
+
+p <- last_cue_counts %>% 
+  ggplot(aes(color=Behavior, 
+             group=Behavior,
+             y=prop_dyads*100, 
+             x = dyad_set)) +
+  geom_point() +
+  geom_line() +
+  ylab("Percent expressing cue") +
+  xlab("Dyad set") +
+  ggtitle("Infants displaying cues at least once in the final 25% of feeding")
+
+p %>% 
+  ggplotly()
+```
+
+The final 25% of feeding time period gives us similar results to final minute frequencies, with the same 3 most common cues and similar ratios between the dyad periods. 
+
+## Final quarter cue frequencies as compared to frequencies in previous quarters of feeding
+
+We will only look as to whether each cue occurs at least once in each quarter, ignoring repeated cues.
+
+```{r last_quarter_proportional}
+after_prop = 0.75
+
+near_final_cues =  data_duration %>% 
+  filter(dyad_unit == "Baby") %>% 
+  filter(Grouped_behavior == "Infant Satiation Cues") %>%  
+  filter(start_fraction > after_prop) %>% 
+  distinct(Behavior, dyad_set, id) #Removes repeated cues from the same infant within the same feeding
+
+n_dyads_cue <- data_duration %>% #Cue representation in dyads before the requested time period
+  filter(dyad_unit == "Baby") %>% 
+  filter(Grouped_behavior == "Infant Satiation Cues") %>%  
+  filter(start_fraction < after_prop) %>% 
+  mutate(quarter = if_else(start_fraction<0.25, 1,
+                      if_else(start_fraction < 0.5, 2,
+                         if_else(start_fraction < 0.75, 3,
+                                 4)))) %>% 
+  distinct(Behavior, dyad_set, id, quarter) %>% #Removes repeated cues from the same infant within the same feeding
+  group_by(dyad_set) %>% 
+  count(Behavior) %>% 
+  mutate(n_dyads = n) %>% 
+  select(!n)
+# Below is copied from final_cues code block
+
+last_cue_counts <- near_final_cues %>% 
+  group_by(dyad_set) %>% 
+  count(Behavior)
+  
+#Creating proportion variable
+last_cue_counts <- last_cue_counts %>% 
+  left_join(n_dyads_cue,
+            on=c(dyad_set, Behavior)) %>% 
+  mutate(prop_dyads = n/n_dyads)
+
+last_cue_counts %>% 
+  ggplot(aes(
+    y=reorder(Behavior, desc(prop_dyads)), 
+    x=prop_dyads*(after_prop/(1-after_prop)), #Adjust proportion for time periods
+    fill = dyad_set)) +
+  geom_bar(position="dodge", stat="identity") +
+  facet_grid(cols = vars(dyad_set)) +
+  ylab("Final Satiation Cue") +
+  xlab("Cue expression relative to other periods") +
+  ggtitle("Relative cue pervailence in the final 25% of feeding",
+          subtitle= "Probability of cue in last 25% divided by average probability\nin the first 75% of feeding") +
+  theme(legend.position = "none") #The fill colors are purely aesthetic so the legend is removed.
+```
+
+How many times more likely are infants to express each cue at least once in the last quarter than in the previous 3 quarters? It turns out that lip compression is highly associated with the last quarter of feeding, being over 1.5-2.5 times as likely to happen at least once in the final quarter than in the other quarters, depending on the infant's age. This plot is important because the previous plot may have suggested that "Shakes head or turns head/body away" would serve as a good indicator of being in the last quarter for 4-6 month infants, the cue is just a common action even in other quarters. The relative frequency of that cue is actually higher in 2 week and 2 month old infants than their older counterparts.
+
+
+
+## Comparing when different cues tend to be expressed by infants
+
+```{r}
+df_points <- data_duration %>% 
+  filter(dyad_unit == "Baby" & Event_Type == "State point")
+
+med_times <- df_points %>% 
+  group_by(Behavior) %>% 
+  summarise(med_time = median(start_fraction)) %>%
+  arrange(med_time) %>% 
+  pull(Behavior)
+
+df_points %>% 
+  ggplot(aes(y=factor(Behavior, levels=med_times), x=start_fraction*100)) +
+  geom_violin()+
+  geom_boxplot(width=0.2, outlier.shape = NA, coef = 0) +
+  facet_grid(cols = vars(dyad_set)) +
+  ylab("Behavior") +
+  xlab("Percent of feeding completed") +
+  ggtitle("Shape and center 50 percentile of cue Times")
+```
+
+Like the previous plot, this one finds the strongest indicator of satiation to be lip compression. This may be the best expression of where within the feeding session infants tend to express each cue, and allows us to see that many cues at different ages are expressed almost uniformly regardless of feeding progress. Those cues may still be important, but cannot be used on their own as indicators that an infant is satiated. Pushing nipple out with tongue or biting it appear to be more common at the start of feeding.
+
+# Cues over the whole duration
+
+This analysis has been moved to infant_descriptive_statistics.
+
+## Work in progress
+
+## Final cues within babies
+
+```{r}
+near_final_cues %>% 
+  mutate(id = factor(id)) %>% 
+  group_by(id) %>% 
+  count(Behavior) %>% 
+  ggplot(aes(x=n)) +
+  geom_bar() +
+  facet_grid(cols=vars(Behavior)) +
+  theme(strip.text.x = element_text(angle=90)) +
+  ggtitle("Individual infants' counts of final cues") +
+  xlab("Number of feedings ending in cue") +
+  ylab("Count of infants") 
+```
+
+## Diagnostics
+
+```{r}
+test_states <- c("Bottle not in mouth", "Bottle in mouth", "Bottle offered")
+test_states <- c("Crying", "Not Crying")
+test_states <- c("Eyes Closed", "Eyes Open")
+
+total_fractions <- data_duration %>%
+  filter(Behavior %in% test_states) %>% 
+  filter(Event_Type == "State start") %>%
+  group_by(id, dyad_set, Behavior) %>% 
+  summarise(total_fraction = sum(duration_fraction))
+
+crying_props <- total_fractions %>% 
+  pivot_wider(names_from=dyad_set, values_from =total_fraction) %>% 
+  group_by(id) %>% 
+  summarise_at(dyad_set_levels, sum) 
+
+#Sum of bottle in mouth fraction time + bottle not in mouth time
+crying_props %>% arrange(crying_props$"4moB")
+
+# Multiple times such as the 54.3198 time_relative_sf + duration_sf do not line up with the start of the next state.
+data_duration %>% 
+  filter(id=="70352") %>% 
+  filter(dyad_set == "4moB") %>% 
+  filter(Behavior %in% test_states) %>% 
+  mutate(next_state_expected = Time_Relative_sf + Duration_sf) %>% 
+  select(id, dyad_set, Time_Relative_sf, Duration_sf, next_state_expected, Behavior)
+  
+  
+data_duration %>% 
+  filter(id=="70352") %>% 
+  filter(dyad_set == "4moB") %>% 
+  filter(Behavior %in% test_states) %>% 
+  select(duration_fraction) %>% 
+  sum()
+```
+

@@ -1,0 +1,221 @@
+---
+title: 'Mom Behaviors - Within Dyad - Whole Feeding - Non-rejectors only'
+author: ""
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+source("shared_setup.R")
+library(plotly)
+```
+
+
+# Number of bottle-in-mouth bouts
+
+```{r}
+
+data_dyad_total_bottle_state <- data_dyad_total_zeros %>%
+  filter(Behavior == "Bottle in mouth")
+
+
+```
+
+
+```{r}
+
+data_dyad_total_selected <- data_dyad_total_bottle_state %>%
+  group_by(id) %>%
+  mutate(max_value = max(num_occurrences),
+         min_value = min(num_occurrences),
+         range_value = max_value - min_value) %>%
+  mutate(num_ages = n()) %>%
+  ungroup() %>%
+  mutate(id = fct_reorder(id, min_value)) %>%
+  mutate(id = fct_reorder(id, range_value))
+
+for (age in 1:n_time_points) {
+  p <- ggplot(data_dyad_total_selected %>%
+             filter(num_ages == age),
+           aes(x = id, y = num_occurrences, color = dyad_set, shape = dyad_set)) +
+      geom_point() +
+      ggtitle(paste("Dyads observed at", age, "ages")) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    labs(y = "Total number of bottle-in-mouth bouts")  +
+    ylim(0, max(data_dyad_total_selected$num_occurrences))
+  print(p)
+}
+
+```
+
+
+
+
+
+```{r}
+
+pd <- position_dodge(0.4)
+
+p <- ggplot(data_dyad_total_selected,
+            aes(x = dyad_set, y = num_occurrences, group = id, color = as_factor(num_ages))) +
+  geom_line(alpha = 0.2, position = pd) +
+  geom_point(position = pd) +
+  labs(y = "Total number of bottle-in-mouth bouts",
+       x = "age", 
+       color = "Number of ages")
+
+ggplotly(p)
+
+```
+
+# Number of bottle-in-mouth bouts, per length (min) of feeding
+
+
+
+```{r}
+
+data_dyad_total_selected <- data_dyad_total_bottle_state %>%
+  group_by(id) %>%
+  mutate(max_value = max(num_per_min),
+         min_value = min(num_per_min),
+         range_value = max_value - min_value) %>%
+  mutate(num_ages = n()) %>%
+  ungroup() %>%
+  mutate(id = fct_reorder(id, min_value)) %>%
+  mutate(id = fct_reorder(id, range_value))
+
+for (age in 1:n_time_points) {
+  p <- ggplot(data_dyad_total_selected %>%
+             filter(num_ages == age),
+           aes(x = id, y = num_per_min, color = dyad_set, shape = dyad_set)) +
+      geom_point() +
+      ggtitle(paste("Dyads observed at", age, "ages")) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    labs(y = "Total number of bottle-in-mouth bouts per minute")  +
+    ylim(0, max(data_dyad_total_selected$num_per_min))
+  print(p)
+}
+
+```
+
+
+```{r}
+
+pd <- position_dodge(0.4)
+
+p <- ggplot(data_dyad_total_selected,
+            aes(x = dyad_set, y = num_per_min, group = id, color = as_factor(num_ages))) +
+  geom_line(alpha = 0.2, position = pd) +
+  geom_point(position = pd) +
+  labs(y = "Total number of bottle-in-mouth bouts per minute",
+       x = "age", 
+       color = "Number of ages")
+
+ggplotly(p)
+
+```
+
+# Fraction of time spent in bottle-in-mouth state
+
+
+
+
+```{r}
+
+data_dyad_total_selected <- data_dyad_total_bottle_state %>%
+  group_by(id) %>%
+  mutate(max_value = max(total_fraction),
+         min_value = min(total_fraction),
+         range_value = max_value - min_value) %>%
+  mutate(num_ages = n()) %>%
+  ungroup() %>%
+  mutate(id = fct_reorder(id, min_value)) %>%
+  mutate(id = fct_reorder(id, range_value))
+
+for (age in 1:n_time_points) {
+  p <- ggplot(data_dyad_total_selected %>%
+             filter(num_ages == age),
+           aes(x = id, y = total_fraction, color = dyad_set, shape = dyad_set)) +
+      geom_point() +
+      ggtitle(paste("Dyads observed at", age, "ages")) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    labs(y = "Total fraction of time in bottle-in-mouth state")  +
+    ylim(0, max(data_dyad_total_selected$total_fraction))
+  print(p)
+}
+
+```
+
+
+
+```{r}
+
+pd <- position_dodge(0.4)
+
+p <- ggplot(data_dyad_total_selected,
+            aes(x = dyad_set, y = total_fraction, group = id, color = as_factor(num_ages))) +
+  geom_line(alpha = 0.2, position = pd) +
+  geom_point(position = pd) +
+  labs(y = "Total fraction of time in bottle-in-mouth state",
+       x = "age", 
+       color = "Number of ages")
+
+ggplotly(p)
+
+```
+
+
+# Individual behaviors
+
+```{r}
+
+for (selected_behavior in mom_behaviors) {
+  
+  data_dyad_total_behaviors_selected <- data_dyad_total_zeros %>%
+    filter(Behavior == selected_behavior) %>%
+    group_by(id) %>%
+    mutate(max_value = max(num_per_min),
+           min_value = min(num_per_min),
+           range_value = max_value - min_value) %>%
+    mutate(num_ages = n()) %>%
+    ungroup() %>%
+  mutate(id = fct_reorder(id, min_value)) %>%
+  mutate(id = fct_reorder(id, range_value))
+  
+  for (age in 1:n_time_points) {
+    p <- ggplot(data_dyad_total_behaviors_selected %>%
+                  filter(num_ages == age),
+                aes(x = id, y = num_per_min, color = dyad_set, shape = dyad_set)) +
+      geom_point() +
+      ggtitle(paste(selected_behavior, "; Dyads observed at", age, "ages")) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+      labs(y = "Number of mom behaviors, per minute")
+    print(p)
+  }
+
+  
+  pd <- position_dodge(0.4)
+  
+  p2 <- ggplot(data_dyad_total_behaviors_selected,
+         aes(x = dyad_set, y = num_per_min, group = id, color = as_factor(num_ages))) +
+    geom_line(alpha = 0.2, position = pd) +
+    geom_point(position = pd) +
+    labs(y = "Number of mom behaviors, per minute",
+         x = "age", 
+         color = "Number of ages") +
+          ggtitle(selected_behavior) 
+  
+  print(p2)
+  
+  
+}
+
+```
+
+
+
+# END
+
+```{r}
+knitr::knit_exit()
+```

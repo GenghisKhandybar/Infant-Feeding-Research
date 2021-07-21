@@ -1,0 +1,2546 @@
+---
+title: 'Mom Response: All Dyads'
+author: ""
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+
+
+```{r, include = FALSE}
+
+library(readr)
+library(dplyr)
+library(tidyr) # need devtools version ?
+library(tibble)
+library(ggplot2)
+library(GGally)
+library(stringr)
+library(purrr)
+library(forcats)
+library(knitr)
+library(purrr)
+library(ggpubr)
+library(cowplot)
+library(gridExtra)
+
+library(gifski)
+library(gganimate)
+# devtools::install_github('haleyjeppson/ggmosaic')
+library(ggmosaic)
+
+
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE,
+                      warning = FALSE)
+
+# Vectorized sequence function
+# seq_vec(x, y) = c(x[1]:y[1], x[2]:y[2], ...)
+seq_vec <- Vectorize(seq.default, vectorize.args = c("from", "to"))
+
+ratio_lines = seq(1, 4, 0.5)
+
+# Reorder dyad_set: 2wk, 2mo, 4mo, 6mo
+dyad_set_levels <- c("2wkB", "2moB", "4moB", "6moB")
+
+n_time_points = length(dyad_set_levels)
+
+```
+
+
+
+```{r, include = FALSE}
+
+# Load data and select non-rejectors c(0), rejectors c(1), or all c(0, 1)
+
+include_rejectors <- c(0, 1)
+
+data_dyad_total_zeros <- read_csv("data-dyad-total-zeros.csv") %>%
+  mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels),
+         id = factor(id),
+         Bottle_Rejector = factor(Bottle_Rejector)) %>%
+  filter(Bottle_Rejector %in% include_rejectors)
+
+data_map <- read_csv("data-map.csv") %>%
+  mutate(id = factor(id))
+
+if(1 %in% include_rejectors) {
+  data_map <- data_map %>%
+    mutate(time_points = Time_points_with_rejectors)
+} else {
+  data_map <- data_map %>%
+    mutate(time_points = Time_points)
+}
+
+```
+
+
+```{r, include = FALSE}
+
+behaviors <- data_dyad_total_zeros %>%
+  select(Behavior) %>%
+  unique() %>%
+  pull()
+
+state_behaviors <- data_dyad_total_zeros %>%
+  filter(Event_Type == "State start") %>%
+  select(Behavior) %>%
+  unique() %>%
+  pull()
+
+point_behaviors <- data_dyad_total_zeros %>%
+  filter(Event_Type == "State point") %>%
+  select(Behavior) %>%
+  unique() %>%
+  pull()
+
+cues <- data_dyad_total_zeros %>%
+  filter(Grouped_behavior == "Infant Satiation Cues") %>%
+  select(Behavior) %>%
+  unique() %>%
+  pull()
+
+mom_behaviors <- data_dyad_total_zeros %>%
+  filter(dyad_unit == "Mom") %>%
+  select(Behavior) %>%
+  unique() %>%
+  pull()
+
+bottle_states <- state_behaviors[grep("Bottle", state_behaviors)]
+
+```
+
+
+# Total number of bottle states in feeding
+
+```{r}
+
+data_dyad_total_bottle_state <- data_dyad_total_zeros %>%
+  filter(Behavior %in% bottle_states)
+
+plot_bottle_in_mouth_pdf <- ggplot(data_dyad_total_bottle_state,
+       aes(x = num_occurrences,
+           y = after_stat(density),
+           colour = dyad_set)) +
+  geom_freqpoly(binwidth = 1, linetype = "solid") +
+  ylab("Proportion of dyads") +
+  xlab("Total number of bouts in feeding") +
+  ggtitle("Bottle states") +
+  facet_wrap(~Behavior)
+
+
+plot_bottle_in_mouth_cdf <- ggplot(data_dyad_total_bottle_state,
+       aes(num_occurrences,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of dyads") +
+  xlab("Total number of bouts in feeding") +
+  facet_wrap(~Behavior)
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+```{r}
+
+ggplot(data_dyad_total_bottle_state,
+       aes(x = dyad_set, y = num_occurrences, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Total number of bouts in feeding") +
+  facet_wrap(~Behavior)
+                 
+```
+
+
+```{r}
+
+data_dyad_total_bottle_state %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize_at(vars(num_occurrences),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+## Number of bottle states per feeding length
+
+
+
+```{r}
+
+ggplot(data_dyad_total_bottle_state,
+       aes(x = num_per_length, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  xlab("Number of bouts per length of feeding") +
+  facet_wrap(~Behavior)
+  
+ggplot(data_dyad_total_bottle_state,
+       aes(x = dyad_set, y = num_per_length, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Number of bouts per length of feeding") +
+  facet_wrap(~Behavior)
+                 
+```
+
+```{r}
+
+data_dyad_total_bottle_state %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize_at(vars(num_per_length),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 4)
+
+```
+
+
+# Total duration in bottle state by dyad
+
+
+
+
+
+```{r}
+
+ggplot(data_dyad_total_bottle_state,
+       aes(x = total_duration, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  xlab("Total duration of dyad bouts (sec)") +
+  facet_wrap(~Behavior)
+  
+ggplot(data_dyad_total_bottle_state,
+       aes(x = dyad_set, y = total_duration, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Total duation of dyad bouts (sec)") +
+  facet_wrap(~Behavior)
+                 
+```
+
+```{r}
+
+data_dyad_total_bottle_state %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize_at(vars(total_duration),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+
+
+
+## Total fraction of feeding time spent in bottle state by dyad
+
+
+
+
+
+```{r}
+
+ggplot(data_dyad_total_bottle_state,
+       aes(x = total_fraction, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  xlab("Total fraction of feeding time spent in state") +
+  facet_wrap(~Behavior)
+  
+ggplot(data_dyad_total_bottle_state,
+       aes(x = dyad_set, y = total_fraction, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Total fraction of feeding time spent in state") +
+  facet_wrap(~Behavior)
+                 
+```
+
+```{r}
+
+data_dyad_total_bottle_state %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize_at(vars(total_fraction),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 4)
+
+```
+
+# All maternal behaviors: dyad totals
+
+## Number of occurrences of each point behavior per dyad, including 0s
+
+
+```{r}
+
+
+
+for (selected_behavior in mom_behaviors) {
+  
+  data_dyad_total_zeros_selected_behavior <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_behavior) %>%
+    filter()
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = num_occurrences,
+                   y = after_stat(density),
+                   color = dyad_set)) +
+    geom_freqpoly(binwidth = 1, linetype = "solid") +
+    ylab("Proportion of dyads") +
+    xlim(0, NA) + 
+    xlab("Number of occurrences of behavior in feeding") +
+    ggtitle(selected_behavior)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = num_occurrences,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Number of occurrences of behavior in feeding") +
+    ggtitle(selected_behavior)
+  
+  grid.arrange(p1, p2, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_behavior %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(num_occurrences),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 1))
+  cat('\n')
+    
+}
+
+```
+
+
+
+## Rate of occurrence of each behavior per dyad, including 0s
+
+```{r}
+
+for (selected_behavior in mom_behaviors) {
+  
+  data_dyad_total_zeros_selected_behavior <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_behavior)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = num_per_length,
+                   y = after_stat(density),
+                   color = dyad_set,
+                   fill = dyad_set)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Number of occurrences of behavior per second") +
+    ggtitle(selected_behavior)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = num_per_length,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Number of occurrences of behavior per second") +
+    ggtitle(selected_behavior)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = dyad_set, y = num_per_length, col = dyad_set)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+    scale_shape_manual(values = c(1, 4)) +
+    ggtitle(selected_behavior)
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_behavior %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(num_per_length),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+
+
+
+## Proportion of dyads that express the behavior at least once during feeding, by age
+
+```{r}
+
+data_proportion_behavior_occurs <-
+  data_dyad_total_zeros %>%
+  filter(Behavior %in% mom_behaviors) %>%
+  mutate(behavior_occurs = as.factor(num_occurrences > 0)) %>%
+  group_by(dyad_set, Behavior, behavior_occurs, .drop = FALSE) %>%
+  summarize(count = n()) %>%
+  pivot_wider(names_from = behavior_occurs, values_from = count) %>%
+  mutate(proportion_dyads_with_behavior = `TRUE` / (`TRUE` + `FALSE`))
+
+ggplot(data_proportion_behavior_occurs,
+       aes(y = reorder(Behavior, proportion_dyads_with_behavior, mean),
+           x = proportion_dyads_with_behavior,
+           col = dyad_set)) +
+  geom_jitter(width = 0, height = 0.1) +
+  xlim(0, 1) + 
+  xlab("Proportion of mothers that express the behavior") +
+  ylab("Maternal behavior") +
+  ggtitle("Proportion of mothers that express behavior\n at least once during feeding")
+
+```
+
+
+
+
+## Number of occurrences of each behavior per dyad, only mothers that express behavior
+
+```{r}
+
+for (selected_behavior in mom_behaviors) {
+  
+  data_dyad_total_zeros_selected_behavior <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_behavior) %>%
+    filter(num_occurrences > 0)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = num_occurrences,
+                   y = after_stat(density),
+                   color = dyad_set)) +
+    geom_freqpoly(binwidth = 1, linetype = "solid") +
+    ylab("Proportion of dyads") +
+    xlim(0, NA) + 
+    xlab("Number of occurrences of behavior in feeding") +
+    ggtitle(selected_behavior)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = num_occurrences,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Number of occurrences of behavior in feeding") +
+    ggtitle(selected_behavior)
+  
+  grid.arrange(p1, p2, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_behavior %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(num_occurrences),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 1))
+  cat('\n')
+    
+}
+
+```
+
+
+
+## Rate of occurrence of each behavior per dyad, only mothers that express behavior
+
+```{r}
+
+for (selected_behavior in mom_behaviors) {
+  
+  data_dyad_total_zeros_selected_behavior <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_behavior)  %>%
+    filter(num_occurrences > 0)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = num_per_length,
+                   y = after_stat(density),
+                   color = dyad_set,
+                   fill = dyad_set)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Number of occurrences of behavior per second") +
+    ggtitle(selected_behavior)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = num_per_length,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Number of occurrences of behavior per second") +
+    ggtitle(selected_behavior)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = dyad_set, y = num_per_length, col = dyad_set)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+    scale_shape_manual(values = c(1, 4)) +
+    ggtitle(selected_behavior)
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_behavior %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(num_per_length),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+
+
+# State behaviors, total duration of feeding time in state (only for mothers that exhibit the behavior)
+
+```{r}
+
+for (selected_behavior in intersect(state_behaviors, mom_behaviors)) {
+  
+  data_dyad_total_zeros_selected_behavior <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_behavior)  %>%
+    filter(num_occurrences > 0)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = total_duration,
+                   y = after_stat(density),
+                   color = dyad_set,
+                   fill = dyad_set)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Total duration (sec)") +
+    ggtitle(selected_behavior)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = total_duration,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Total duration (sec)") +
+    ggtitle(selected_behavior)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = dyad_set,
+                   y = total_duration,
+                   col = dyad_set)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+    scale_shape_manual(values = c(1, 4)) +
+    xlab("Total duration (sec)") +
+    ggtitle(selected_behavior)
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_behavior %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(total_duration),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 1))
+  cat('\n')
+  
+}
+
+```
+
+
+# State behaviors, total proportion of feeding time in state (only for mothers that exhibit the behavior)
+
+
+```{r}
+
+for (selected_behavior in intersect(state_behaviors, mom_behaviors)) {
+  
+  data_dyad_total_zeros_selected_behavior <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_behavior)  %>%
+    filter(num_occurrences > 0)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = total_fraction,
+                   y = after_stat(density),
+                   color = dyad_set,
+                   fill = dyad_set)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Proportion of total feeding time spent in state") +
+    ggtitle(selected_behavior)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = total_fraction,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Proportion of total feeding time spent in state") +
+    ggtitle(selected_behavior)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_behavior,
+               aes(x = dyad_set,
+                   y = total_fraction,
+                   col = dyad_set)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+    scale_shape_manual(values = c(1, 4)) +
+    xlab("Proportion of total feeding time spent in state") +
+    ggtitle(selected_behavior)
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_behavior %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(total_duration),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+
+
+
+
+
+# END
+
+```{r}
+knitr::knit_exit()
+```
+
+# READ THIS FOR INTERACTIONS
+
+To find the first mom response after infant cue
+
+- filter the infant cues, only need cue and time
+- join the filtered infant cues back with the full data: left_join(full data, cues)
+- fill the NAs with the time of the most recent cue and the cue
+- group_by(dyad_set, id, recent_cue, recent_time)
+- filter the first mom response for each cue
+
+## Individual dyads across age (for dyads observed at multiple ages)
+
+
+```{r, include = FALSE}
+
+video_lengths_individual <-
+  inner_join(video_lengths, data_map, by = "id") %>%
+  filter(time_points > 1) %>%
+  ungroup() %>%
+  group_by(id) %>%
+  mutate(max_video_length = max(video_length),
+         min_video_length = min(video_length),
+         ratio = max_video_length / min_video_length,
+         range = max_video_length - min_video_length) %>%
+    filter(row_number() == 1)
+```
+
+
+
+
+```{r,  fig.show="hold", out.width="50%"}
+
+ggplot(video_lengths_individual, 
+         aes(x = ratio)) +
+  geom_histogram(aes(y=..density..), binwidth = 0.25) +
+  geom_rug() + 
+  xlab("ratio of length of longest video to shortest video")
+
+ggplot(video_lengths_individual,
+       aes(x = min_video_length,
+           y = max_video_length,
+           color = ratio,
+           shape = Bottle_Rejector)) +
+  geom_point() +
+  scale_color_gradient(low="blue", high="orange") +
+  xlim(0, NA) +
+  ylim(0, NA) +
+  xlab("shortest video length") +
+  ylab("longest video length") +
+  ggtitle("Infants observed at multiple ages") +
+  geom_abline(intercept = 0, slope = ratio_lines, linetype = 2, color = ratio_lines) +
+  scale_shape_manual(values = c(1, 4))
+
+```
+
+```{r}
+
+video_lengths_individual %>%
+  ungroup() %>%
+  summarize_at(vars(ratio),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 2)
+
+```
+
+
+
+```{r, include = TRUE}
+
+video_lengths_individual <-
+  inner_join(video_lengths, data_map, by = "id") %>%
+  filter(time_points == n_time_points) %>%
+  ungroup() %>%
+  group_by(id) %>%
+  mutate(max_video_length = max(video_length),
+         min_video_length = min(video_length),
+         range_video_length = max_video_length - min_video_length) %>%
+  ungroup()
+
+ggplot(video_lengths_individual %>%
+         mutate(id = fct_reorder(id, range_video_length)),
+       aes(x = id, y = video_length, col = dyad_set)) +
+  coord_flip() +
+  ggtitle("Infants observed at all time points") +
+  geom_point(aes(shape = Bottle_Rejector)) +
+  scale_shape_manual(values = c(1, 4))
+
+```
+
+
+
+
+
+
+# Total number of cues
+
+```{r}
+# total number of cues and types of cues
+
+data_dyad_total_cues <- data_dyad_total_zeros %>%
+  filter(dyad_unit == "Baby") %>%
+  filter(!(Behavior %in% c("Eyes Open", "Not Crying"))) %>%
+  group_by(dyad_set, id) %>%
+  summarize(Bottle_Rejector = first(Bottle_Rejector),
+            num_cues = sum(num_occurrences),
+            num_types = n_distinct(Behavior[num_occurrences > 0]),
+            num_cues_per_length = sum(num_per_length),
+            video_length = max(video_length)) %>%
+  mutate(num_types_per_length = num_types / video_length)
+
+```
+
+## Number of infant cues in feeding
+
+```{r}
+ggplot(data_dyad_total_cues,
+       aes(x = num_cues, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity")
+  
+ggplot(data_dyad_total_cues,
+       aes(x = dyad_set, y = num_cues, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Total number of infant cues in feeding")
+                 
+```
+
+
+
+```{r}
+
+data_dyad_total_cues %>% 
+  group_by(dyad_set) %>%
+  summarize_at(vars(num_cues),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+
+## Number of cues per length of feeding
+
+```{r}
+ggplot(data_dyad_total_cues,
+       aes(x = num_cues_per_length, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  ylab("Total number of infants cues divided by length of feeding")
+  
+ggplot(data_dyad_total_cues,
+       aes(x = dyad_set, y = num_cues_per_length, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Total number of infants cues divided by length of feeding")
+                 
+```
+
+
+```{r}
+
+data_dyad_total_cues %>% 
+  group_by(dyad_set) %>%
+  summarize_at(vars(num_cues_per_length),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 4)
+
+```
+
+
+
+## Number of infant cues in feeding, excluding Crying and Eyes Closed
+
+```{r}
+
+data_dyad_total_cues_point <- data_dyad_total_zeros %>%
+  filter(dyad_unit == "Baby") %>%
+  filter(!(Behavior %in% c("Eyes Open", "Not Crying"))) %>%
+  filter(Behavior %in% intersect(cues, point_behaviors)) %>%
+  group_by(dyad_set, id) %>%
+  summarize(Bottle_Rejector = first(Bottle_Rejector),
+            num_cues = sum(num_occurrences),
+            num_types = n_distinct(Behavior[num_occurrences > 0]),
+            num_cues_per_length = sum(num_per_length),
+            video_length = max(video_length))
+
+ggplot(data_dyad_total_cues_point,
+       aes(x = num_cues, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity")
+  
+ggplot(data_dyad_total_cues_point,
+       aes(x = dyad_set, y = num_cues, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Total number of infant cues in feeding") +
+  ggtitle("Excluding state cues (Crying and Eyes Closed)")
+                 
+```
+
+```{r}
+
+data_dyad_total_cues_point %>% 
+  group_by(dyad_set) %>%
+  summarize_at(vars(num_cues),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+
+## Number of cues per length of feeding, excluding Crying and Eyes Closed
+
+```{r}
+ggplot(data_dyad_total_cues_point,
+       aes(x = num_cues_per_length, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  ylab("Total number of infants cues divided by length of feeding") +
+  ggtitle("Excluding state cues (Crying and Eyes Closed)")
+  
+ggplot(data_dyad_total_cues_point,
+       aes(x = dyad_set, y = num_cues_per_length, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Total number of infants cues divided by length of feeding") +
+  ggtitle("Excluding state cues (Crying and Eyes Closed)")
+                 
+```
+
+
+
+```{r}
+
+data_dyad_total_cues_point %>% 
+  group_by(dyad_set) %>%
+  summarize_at(vars(num_cues_per_length),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 4)
+
+```
+
+
+# Number of different types of cues
+
+## Number of types
+
+```{r}
+
+ggplot(data_dyad_total_cues,
+       aes(x = num_types,
+           y = after_stat(density),
+           color = dyad_set)) +
+  geom_freqpoly(binwidth = 1, linetype = "solid") +
+  ylab("Proportion of dyads") +
+  xlab("Number of different types of cues")
+
+ggplot(data_dyad_total_cues,
+       aes(x = dyad_set, y = num_types, col = dyad_set)) +
+  coord_flip() +
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4))
+
+```
+
+```{r}
+
+data_dyad_total_cues %>% 
+  group_by(dyad_set) %>%
+  summarize_at(vars(num_types),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 2)
+
+```
+
+## Number of types per length of feeding
+
+```{r}
+ggplot(data_dyad_total_cues,
+       aes(x = num_types_per_length, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  xlab("Number of different types divided by length of feeding")
+  
+ggplot(data_dyad_total_cues,
+       aes(x = dyad_set, y = num_types_per_length, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4))  +
+  ylab("Number of different types divided by length of feeding")
+                 
+```
+
+
+
+```{r}
+
+data_dyad_total_cues %>% 
+  group_by(dyad_set) %>%
+  summarize_at(vars(num_types_per_length),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 3)
+
+```
+
+# Individual cues
+
+
+
+## Number of occurrences of each cue per dyad, including 0s
+
+
+
+
+
+```{r}
+
+for (selected_cue in cues) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_cue)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_occurrences,
+                   y = after_stat(density),
+                   color = dyad_set)) +
+    geom_freqpoly(binwidth = 1, linetype = "solid") +
+    ylab("Proportion of dyads") +
+    xlim(0, NA) + 
+    xlab("Number of occurrences of cue in feeding") +
+    ggtitle(selected_cue)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_occurrences,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Number of occurrences of cue in feeding") +
+    ggtitle(selected_cue)
+  
+  grid.arrange(p1, p2, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(num_occurrences),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 1))
+  cat('\n')
+    
+}
+
+```
+
+
+
+## Rate of occurrence of each cue per dyad, including 0s
+
+```{r}
+
+for (selected_cue in cues) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_cue)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_length,
+                   y = after_stat(density),
+                   color = dyad_set,
+                   fill = dyad_set)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Number of occurrences of cue per second") +
+    ggtitle(selected_cue)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_length,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Number of occurrences of cue per second") +
+    ggtitle(selected_cue)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = dyad_set, y = num_per_length, col = dyad_set)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+    scale_shape_manual(values = c(1, 4)) +
+    ggtitle(selected_cue)
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(num_per_length),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+
+
+
+## Proportion of dyads that express the cue at least once during feeding, by age
+
+```{r}
+
+data_proportion_cue_occurs <-
+  data_dyad_total_zeros %>%
+  filter(Behavior %in% cues) %>%
+  mutate(cue_occurs = as.factor(num_occurrences > 0)) %>%
+  group_by(dyad_set, Behavior, cue_occurs, .drop = FALSE) %>%
+  summarize(count = n()) %>%
+  pivot_wider(names_from = cue_occurs, values_from = count) %>%
+  mutate(proportion_dyads_with_cue = `TRUE` / (`TRUE` + `FALSE`))
+
+ggplot(data_proportion_cue_occurs,
+       aes(y = reorder(Behavior, proportion_dyads_with_cue, mean),
+           x = proportion_dyads_with_cue,
+           col = dyad_set)) +
+  geom_jitter(width = 0, height = 0.1) +
+  xlim(0, 1) + 
+  xlab("Proportion of infants that express the cue") +
+  ylab("Infant cue") +
+  ggtitle("Proportion of infants that express cue\n at least once during feeding")
+
+```
+
+
+
+
+## Number of occurrences of each cue per dyad, only infants that express cue
+
+```{r}
+
+for (selected_cue in cues) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_cue) %>%
+    filter(num_occurrences > 0)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_occurrences,
+                   y = after_stat(density),
+                   color = dyad_set)) +
+    geom_freqpoly(binwidth = 1, linetype = "solid") +
+    ylab("Proportion of dyads") +
+    xlim(0, NA) + 
+    xlab("Number of occurrences of cue in feeding") +
+    ggtitle(selected_cue)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_occurrences,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Number of occurrences of cue in feeding") +
+    ggtitle(selected_cue)
+  
+  grid.arrange(p1, p2, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(num_occurrences),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 1))
+  cat('\n')
+    
+}
+
+```
+
+
+
+## Rate of occurrence of each cue per dyad, only infants that express cue
+
+```{r}
+
+for (selected_cue in cues) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_cue)  %>%
+    filter(num_occurrences > 0)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_length,
+                   y = after_stat(density),
+                   color = dyad_set,
+                   fill = dyad_set)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Number of occurrences of cue per second") +
+    ggtitle(selected_cue)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_length,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Number of occurrences of cue per second") +
+    ggtitle(selected_cue)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = dyad_set, y = num_per_length, col = dyad_set)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+    scale_shape_manual(values = c(1, 4)) +
+    ggtitle(selected_cue)
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(num_per_length),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+# Crying and Eyes Closed
+
+## Crying and Eyes Closed, total time (only for infants that exhibit the cue)
+
+
+```{r}
+
+for (selected_cue in intersect(state_behaviors, cues)) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_cue)  %>%
+    filter(num_occurrences > 0)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = total_duration,
+                   y = after_stat(density),
+                   color = dyad_set,
+                   fill = dyad_set)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Total duration (sec)") +
+    ggtitle(selected_cue)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = total_duration,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Total duration (sec)") +
+    ggtitle(selected_cue)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = dyad_set,
+                   y = total_duration,
+                   col = dyad_set)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+    scale_shape_manual(values = c(1, 4)) +
+    xlab("Total duration (sec)") +
+    ggtitle(selected_cue)
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(total_duration),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 1))
+  cat('\n')
+  
+}
+
+```
+
+
+## Crying and Eyes Closed, total proportion of feeding time in state (only for infants that exhibit the cue)
+
+
+```{r}
+
+for (selected_cue in intersect(state_behaviors, cues)) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_cue)  %>%
+    filter(num_occurrences > 0)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = total_fraction,
+                   y = after_stat(density),
+                   color = dyad_set,
+                   fill = dyad_set)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Proportion of total feeding time spent in state") +
+    ggtitle(selected_cue)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = total_fraction,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Proportion of total feeding time spent in state") +
+    ggtitle(selected_cue)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = dyad_set,
+                   y = total_fraction,
+                   col = dyad_set)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+    scale_shape_manual(values = c(1, 4)) +
+    xlab("Proportion of total feeding time spent in state") +
+    ggtitle(selected_cue)
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(total_duration),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+
+
+
+
+
+# Individual infants across ages (only for infants observed at more than 1 age)
+
+
+## Total number of cues per length
+
+
+```{r, include = FALSE}
+
+cues_individual <-
+  inner_join(data_dyad_total_cues, data_map, by = "id") %>%
+  filter(time_points > 1) %>%
+  ungroup() %>%
+  group_by(id) %>%
+  mutate(max_value = max(num_cues_per_length),
+         min_value = min(num_cues_per_length),
+         range = max_value - min_value,
+         ratio = max_value / min_value) %>%
+  filter(row_number() == 1)
+
+```
+
+
+
+
+```{r,  fig.show="hold", out.width="50%"}
+
+ggplot(cues_individual, 
+         aes(x = ratio)) +
+  geom_histogram(aes(y=..density..), binwidth = 0.25) +
+  geom_rug() + 
+  xlab("Ratio of largest to smallest cue rate")
+
+ggplot(cues_individual,
+       aes(x = min_value,
+           y = max_value,
+           color = ratio,
+           shape = Bottle_Rejector)) +
+  geom_point() +
+  scale_color_gradient(low="blue", high="orange") +
+  xlim(0, NA) +
+  ylim(0, NA) +
+  xlab("Smallest cue rate") +
+  ylab("Largest cue rate") +
+  geom_abline(intercept = 0, slope = ratio_lines, linetype = 2, color = ratio_lines)  +
+  scale_shape_manual(values = c(1, 4))
+
+```
+
+```{r, include = TRUE}
+
+cues_individual <-
+  inner_join(data_dyad_total_cues, data_map, by = "id") %>%
+  filter(time_points == n_time_points) %>%
+  ungroup() %>%
+  group_by(id) %>%
+  mutate(max_value = max(num_cues_per_length),
+         min_value = min(num_cues_per_length),
+         range = max_value - min_value,
+         ratio = max_value / min_value) %>%
+  ungroup()
+
+
+ggplot(cues_individual %>%
+         mutate(id = fct_reorder(id, range)),
+       aes(x = id, y = num_cues_per_length, col = dyad_set)) +
+  coord_flip() +
+  ggtitle("Infants observed at all time points") +
+  geom_point(aes(shape = Bottle_Rejector)) +
+  scale_shape_manual(values = c(1, 4))
+
+```
+
+## Individual cues, only for infants that express the cue at least once at multiple ages
+
+
+```{r}
+
+for (selected_cue in cues) {
+  
+  selected_cue_individual <-
+    inner_join(data_dyad_total_zeros %>%
+                 filter(Behavior == selected_cue),
+               data_map, by = "id") %>%
+    filter(time_points > 1) %>%
+    ungroup() %>%
+    group_by(id) %>%
+    mutate(max_value = max(num_per_length),
+           min_value = min(num_per_length)) %>%
+    filter(min_value > 0) %>%
+    mutate(range = max_value - min_value,
+           ratio = max_value / min_value) %>%
+    filter(row_number() == 1)
+  
+  
+  p1 <- ggplot(selected_cue_individual, 
+               aes(x = ratio)) +
+    geom_histogram(aes(y=..density..), binwidth = 0.25, na.rm = TRUE) +
+    geom_rug() + 
+    xlab("Ratio of largest to smallest cue rate")  +
+    ggtitle(selected_cue)
+  
+  p2 <- ggplot(selected_cue_individual,
+               aes(x = min_value,
+                   y = max_value,
+                   color = ratio,
+                   shape = Bottle_Rejector)) +
+    geom_point() +
+    scale_color_gradient(low="blue", high="orange") +
+    xlim(0, NA) +
+    ylim(0, NA) +
+    xlab("Smallest cue rate") +
+    ylab("Largest cue rate") +
+    geom_abline(intercept = 0, slope = ratio_lines, linetype = 2, color = ratio_lines)  +
+    scale_shape_manual(values = c(1, 4))  +
+    ggtitle(selected_cue)
+  
+  
+  grid.arrange(p1, p2, ncol = 2)
+  
+  t <- selected_cue_individual %>% 
+    ungroup() %>%
+    summarize_at(vars(ratio),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 2))
+  cat('\n')
+  
+}
+
+```
+
+
+
+
+
+
+## Total number of different types of cues
+
+
+```{r, include = FALSE}
+
+types_individual <-
+  inner_join(data_dyad_total_cues, data_map, by = "id") %>%
+  filter(time_points > 1) %>%
+  ungroup() %>%
+  group_by(id) %>%
+  mutate(max_value = max(num_types),
+         min_value = min(num_types),
+         range = max_value - min_value,
+         ratio = max_value / min_value) %>%
+  filter(row_number() == 1)
+
+```
+
+```{r}
+ggplot(types_individual) +
+   geom_mosaic(aes(x = product(min_value, max_value), fill=factor(min_value))) +    theme(axis.text.x=element_text(angle=-25, hjust= .1)) +
+  labs(x="Min ", title='xxx', y = "max") +
+  guides(fill=guide_legend(title = "min", reverse = TRUE))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+for (selected_cue in cues) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_zeros %>%
+    filter(Behavior == selected_cue) %>%
+    mutate(cue_occurs = (num_occurrences > 0)) %>%
+    group_by(dyad_set, cue_occurs) %>%
+    summarize(count = n())
+  
+  ggplot(data_dyad_total_zeros_selected_cue,
+         aes(x = dyad_set, y = count, fill = cue_occurs)) +
+  geom_bar(position="fill", stat="identity") +
+  ylab("Proportion of dyads")
+
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_length,
+                   y = after_stat(density),
+                   color = dyad_set,
+                   fill = dyad_set)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Number of occurrences of cue per second") +
+    ggtitle(selected_cue)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_length,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Number of occurrences of cue per second") +
+    ggtitle(selected_cue)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = dyad_set, y = num_per_length, col = dyad_set)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+    scale_shape_manual(values = c(1, 4)) +
+    ggtitle(selected_cue)
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(num_per_length),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+
+```{r}
+
+data_crying_total <- data_dyad_total %>% 
+  filter(Behavior %in% c("Crying", "Not Crying")) %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize(num_dyads = n()) %>%
+  pivot_wider(names_from = Behavior, values_from = num_dyads) %>%
+  rename(Total = `Not Crying`) %>% 
+  mutate(No_Crying = Total - Crying) %>%
+  select(-Total)
+
+data_crying_total %>%
+  kable()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+cues_point <- intersect(cues, point_behaviors)
+```
+
+
+
+
+
+## Individual dyads
+
+
+
+
+
+```{r}
+cues_individual <-
+  inner_join(data_dyad_total_cues, data_map, by = "id") %>%
+  filter(Time_points > 1)  %>%
+  ungroup() %>%
+  group_by(id) %>%
+  mutate(max_num_cues = max(num_cues),
+         min_num_cues = min(num_cues),
+         range_num_cues = max_num_cues - min_num_cues,
+         max_num_types = max(num_types),
+         min_num_types = min(num_types),
+         range_num_types = max_num_types - min_num_types,
+         max_cues_per_length = max(num_cues_per_length),
+         min_cues_per_length = min(num_cues_per_length),
+         range_cues_per_length = max_cues_per_length - min_cues_per_length,
+         max_types_per_length = max(num_types_per_length),
+         min_types_per_length = min(num_types_per_length),
+         range_types_per_length = max_types_per_length - min_types_per_length) %>%
+    filter(row_number() == 1) %>%
+  select(-c(dyad_set, num_cues, num_types, cues_per_length, num_types_per_length))
+```
+
+
+```{r}
+ggplot(cues_individual %>%
+         mutate(ratio = max_num_cues / min_num_cues),
+       aes(x = ratio, y = ..density..)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.25, alpha=0.3, position = "identity") +
+  geom_rug(sides = "b", aes(y = 0)) +
+  labs(x = "Ratio of largest to smallest total number of cues")
+
+ratio_lines = seq(1.0, 5.0, 0.5)
+
+
+ggplot(cues_individual,
+       aes(x = min_num_cues, y = max_num_cues, shape = Bottle_Rejector)) +
+  geom_point() +
+  scale_shape_manual(values = c(1, 4)) +
+  geom_abline(intercept = 0, slope = ratio_lines, linetype = 2, color = ratio_lines) + 
+      labs(x = "Smallest total number of cues",
+         y = "Largest total number of cues")
+
+```
+
+
+```{r}
+cues_individual_all_times <-
+  inner_join(data_cues_dyad_total, data_map, by = "id") %>%
+  filter(Time_points == n_time_points) %>%
+  ungroup() %>%
+  group_by(id) %>%
+  mutate(max_num_cues = max(num_cues),
+         min_num_cues = min(num_cues),
+         range_num_cues = max_num_cues - min_num_cues) %>%
+  ungroup() %>%
+  mutate(id = fct_reorder(id, range_num_cues))
+
+ggplot(cues_individual_all_times,
+       aes(x = id, y = num_cues, col = dyad_set)) +
+  coord_flip() +
+  geom_point(aes(shape = Bottle_Rejector)) +
+  scale_shape_manual(values = c(1, 4))
+
+
+```
+
+
+
+# Crying
+
+## Crying (time)
+
+```{r}
+
+data_crying_total <- data_dyad_total %>% 
+  filter(Behavior %in% c("Crying", "Not Crying")) %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize(num_dyads = n()) %>%
+  pivot_wider(names_from = Behavior, values_from = num_dyads) %>%
+  rename(Total = `Not Crying`) %>% 
+  mutate(No_Crying = Total - Crying) %>%
+  select(-Total)
+
+data_crying_total %>%
+  kable()
+
+```
+
+
+
+```{r}
+
+data_crying_total <- data_dyad_total %>% 
+  filter(Behavior %in% c("Crying", "Not Crying")) %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize(num_dyads = n()) %>%
+  pivot_wider(names_from = Behavior, values_from = num_dyads) %>%
+  rename(Total = `Not Crying`) %>% 
+  mutate(No_Crying = Total - Crying) %>%
+  select(-Total)
+
+data_crying_total %>%
+  kable()
+
+data_crying_total <- data_crying_total %>%
+  pivot_longer(!dyad_set, names_to = "Some_Crying", values_to = "num_dyads")
+
+ggplot(data_crying_total,
+       aes(fill=Some_Crying, y=num_dyads, x=dyad_set)) + 
+  geom_bar(position="fill", stat="identity") +
+  ylab("Proportion of dyads")
+
+
+
+```
+
+
+
+
+```{r}
+ggplot(data_dyad_total %>% 
+         filter(Behavior %in% c("Crying")) ,
+       aes(x = total_duration, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity")
+  
+ggplot(data_dyad_total %>% 
+         filter(Behavior %in% c("Crying")),
+       aes(x = dyad_set, y = total_duration, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4))
+                 
+```
+
+
+
+```{r}
+
+data_dyad_total %>% 
+  filter(Behavior %in% c("Crying")) %>%
+  group_by(dyad_set) %>%
+  summarize_at(vars(total_duration),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+## Crying (fraction)
+
+
+
+
+```{r}
+ggplot(data_dyad_total %>% 
+         filter(Behavior %in% c("Crying")) ,
+       aes(x = total_fraction, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity")
+  
+ggplot(data_dyad_total %>% 
+         filter(Behavior %in% c("Crying")),
+       aes(x = dyad_set, y = total_fraction, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4))
+                 
+```
+
+
+
+```{r}
+
+data_dyad_total %>% 
+  filter(Behavior %in% c("Crying")) %>%
+  group_by(dyad_set) %>%
+  summarize_at(vars(total_fraction),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 3)
+
+```
+
+
+## Here are the babies that spend over 50% of the feeding Crying.
+
+```{r}
+data_dyad_total %>% 
+  filter(Behavior %in% c("Crying")) %>%
+  filter(total_fraction > 0.5) %>%
+  select(dyad_set, id, Behavior, total_fraction) %>%
+  arrange(desc(total_fraction)) %>%
+  kable(digits = 3)
+```
+
+
+## Individual dyads across age (for dyads observed at multiple ages)
+
+
+
+```{r}
+crying_individual <-
+  left_join(data_ids,
+            data_dyad_total %>% filter(Behavior == "Crying"),
+            by = c("dyad_set", "id")) %>% 
+  mutate(Behavior = "Crying") %>% 
+  mutate(
+    across(where(is.numeric), ~replace_na(.x, 0))
+  )%>%
+  filter(Time_points > 1) %>%
+  ungroup() %>%
+  group_by(id) %>%
+  mutate(max_fraction = max(total_fraction),
+         min_fraction = min(total_fraction),
+         range_fraction = max_fraction - min_fraction) %>%
+  filter(row_number() == 1)
+
+```
+
+
+```{r,  fig.show="hold", out.width="50%"}
+
+ggplot(crying_individual %>%
+         mutate(ratio = max_fraction / min_fraction),
+       aes(x = ratio, y = ..density..)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.25, alpha=0.3, position = "identity") +
+  geom_rug(sides = "b", aes(y = 0)) +
+  labs(x = "Ratio of longest to shortest fraction of time Crying")
+
+ratio_lines = seq(1.0, 5.0, 0.5)
+
+ggplot(crying_individual,
+       aes(x = min_fraction, y = max_fraction, shape = Bottle_Rejector)) +
+  geom_point() +
+  scale_shape_manual(values = c(1, 4)) +
+  geom_abline(intercept = 0, slope = ratio_lines, linetype = 2, color = ratio_lines) +
+      labs(x = "Shortest fraction Crying",
+         y = "Longest fraction Crying",
+         color = "Legend") +
+    scale_color_manual(values = ratio_lines)
+
+```
+
+
+## Eyes Closed (time)
+
+
+
+```{r}
+
+data_eyes_total <- data_dyad_total %>% 
+  filter(Behavior %in% c("Eyes Closed", "Eyes Open")) %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize(num_dyads = n()) %>%
+  pivot_wider(names_from = Behavior, values_from = num_dyads) %>%
+  rename(Total = `Eyes Open`) %>% 
+  mutate(No_Eyes_Closed = Total - `Eyes Closed`) %>%
+  select(-Total)
+
+data_eyes_total %>%
+  kable()
+
+data_eyes_total <- data_eyes_total %>%
+  pivot_longer(!dyad_set, names_to = "Eyes", values_to = "num_dyads")
+
+ggplot(data_eyes_total,
+       aes(fill = Eyes, y = num_dyads, x = dyad_set)) + 
+  geom_bar(position = "fill", stat = "identity") +
+  ylab("Proportion of dyads")
+
+
+
+```
+
+
+
+
+```{r}
+ggplot(data_dyad_total %>% 
+         filter(Behavior %in% c("Eyes Closed")) ,
+       aes(x = total_duration, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity")
+  
+ggplot(data_dyad_total %>% 
+         filter(Behavior %in% c("Eyes Closed")),
+       aes(x = dyad_set, y = total_duration, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4))
+                 
+```
+
+
+
+```{r}
+
+data_dyad_total %>% 
+  filter(Behavior %in% c("Eyes Closed")) %>%
+  group_by(dyad_set) %>%
+  summarize_at(vars(total_duration),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+
+## Eyes Closed (fraction)
+
+
+
+
+```{r}
+ggplot(data_dyad_total %>% 
+         filter(Behavior %in% c("Eyes Closed")) ,
+       aes(x = total_fraction, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity")
+  
+ggplot(data_dyad_total %>% 
+         filter(Behavior %in% c("Eyes Closed")),
+       aes(x = dyad_set, y = total_fraction, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4))
+                 
+```
+
+
+
+```{r}
+
+data_dyad_total %>% 
+  filter(Behavior %in% c("Eyes Closed")) %>%
+  group_by(dyad_set) %>%
+  summarize_at(vars(total_fraction),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 3)
+
+```
+
+# On average, how many cues do babies display at each age? Does this change over time?
+
+
+
+```{r}
+# Totals for cues of each type per dyad
+
+data_cues <- data_duration %>%
+  filter(dyad_unit == "Baby") %>%
+  filter(!(Behavior %in% c("Eyes Open", "Not Crying"))) %>%
+  group_by(dyad_set, id, Behavior) %>%
+  summarize(Bottle_Rejector = first(Bottle_Rejector),
+            Event_Type = first(Event_Type),
+            total_fraction = sum(duration_fraction), 
+            total_duration = sum(duration),
+            num_occurrences = n(),
+            video_length = max(video_length)) %>%
+  mutate(num_per_length = num_occurrences / video_length)
+
+# Dyad totals; total number of cues and number of different types of cues
+
+data_cues_dyad_total <- data_cues %>%
+  summarize(Bottle_Rejector = first(Bottle_Rejector),
+            num_cues = sum(num_occurrences),
+            num_types = n_distinct(Behavior),
+            cues_per_length = sum(num_per_length),
+            video_length = max(video_length)) %>%
+  mutate(num_types_per_length = num_types / video_length)
+
+```
+
+
+
+
+## Total number of cues
+
+
+
+
+```{r}
+ggplot(data_cues_dyad_total,
+       aes(x = num_cues, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity")
+  
+ggplot(data_cues_dyad_total,
+       aes(x = dyad_set, y = num_cues, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4))
+                 
+```
+
+
+
+```{r}
+
+data_cues_dyad_total %>% 
+  group_by(dyad_set) %>%
+  summarize_at(vars(num_cues),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+## Dyads with the most infant cues.
+
+```{r}
+data_cues_dyad_total %>%
+  arrange(desc(num_cues)) %>%
+  select(dyad_set, id, num_cues) %>%
+  head(10) %>%
+  kable()
+```
+
+
+
+```{r}
+cues_individual <-
+  inner_join(data_cues_dyad_total, data_map, by = "id") %>%
+  filter(Time_points > 1)  %>%
+  ungroup() %>%
+  group_by(id) %>%
+  mutate(max_num_cues = max(num_cues),
+         min_num_cues = min(num_cues),
+         range_num_cues = max_num_cues - min_num_cues,
+         max_num_types = max(num_types),
+         min_num_types = min(num_types),
+         range_num_types = max_num_types - min_num_types,
+         max_cues_per_length = max(cues_per_length),
+         min_cues_per_length = min(cues_per_length),
+         range_cues_per_length = max_cues_per_length - min_cues_per_length,
+         max_types_per_length = max(num_types_per_length),
+         min_types_per_length = min(num_types_per_length),
+         range_types_per_length = max_types_per_length - min_types_per_length) %>%
+    filter(row_number() == 1) %>%
+  select(-c(dyad_set, num_cues, num_types, cues_per_length, num_types_per_length))
+```
+
+
+```{r}
+ggplot(cues_individual %>%
+         mutate(ratio = max_num_cues / min_num_cues),
+       aes(x = ratio, y = ..density..)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.25, alpha=0.3, position = "identity") +
+  geom_rug(sides = "b", aes(y = 0)) +
+  labs(x = "Ratio of largest to smallest total number of cues")
+
+ratio_lines = seq(1.0, 5.0, 0.5)
+
+
+ggplot(cues_individual,
+       aes(x = min_num_cues, y = max_num_cues, shape = Bottle_Rejector)) +
+  geom_point() +
+  scale_shape_manual(values = c(1, 4)) +
+  geom_abline(intercept = 0, slope = ratio_lines, linetype = 2, color = ratio_lines) + 
+      labs(x = "Smallest total number of cues",
+         y = "Largest total number of cues")
+
+```
+
+
+```{r}
+cues_individual_all_times <-
+  inner_join(data_cues_dyad_total, data_map, by = "id") %>%
+  filter(Time_points == n_time_points) %>%
+  ungroup() %>%
+  group_by(id) %>%
+  mutate(max_num_cues = max(num_cues),
+         min_num_cues = min(num_cues),
+         range_num_cues = max_num_cues - min_num_cues) %>%
+  ungroup() %>%
+  mutate(id = fct_reorder(id, range_num_cues))
+
+ggplot(cues_individual_all_times,
+       aes(x = id, y = num_cues, col = dyad_set)) +
+  coord_flip() +
+  geom_point(aes(shape = Bottle_Rejector)) +
+  scale_shape_manual(values = c(1, 4))
+
+
+```
+
+
+
+## Total number of cues per video length (cue rate)
+
+
+
+
+```{r}
+ggplot(data_cues_dyad_total,
+       aes(x = cues_per_length, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity")
+  
+ggplot(data_cues_dyad_total,
+       aes(x = dyad_set, y = cues_per_length, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4))
+                 
+```
+
+
+
+```{r}
+
+data_cues_dyad_total %>% 
+  group_by(dyad_set) %>%
+  summarize_at(vars(cues_per_length),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 3)
+
+```
+
+
+```{r}
+ggplot(cues_individual,
+       aes(x = min_cues_per_length, y = max_cues_per_length, shape = Bottle_Rejector)) +
+  geom_point() +
+  scale_shape_manual(values = c(1, 4)) +
+  geom_abline(intercept = 0, slope = 1, linetype = 2, color = "orange")
+
+```
+
+
+
+```{r}
+ggplot(cues_individual_all_times,
+       aes(x = id, y = cues_per_length, col = dyad_set)) +
+  coord_flip() +
+  geom_point(aes(shape = Bottle_Rejector)) +
+  scale_shape_manual(values = c(1, 4))
+```
+
+
+
+## By Cue
+
+```{r}
+
+cues_point <- intersect(cues, point_behaviors)
+
+for (selected_cue in cues_point) {
+  
+  data_selected_cue_total <- left_join(data_ids, data_dyad_total %>% filter(Behavior == selected_cue), by = c("dyad_set", "id")) %>% 
+    mutate(Behavior = selected_cue) %>% 
+    mutate(
+      across(where(is.numeric), ~replace_na(.x, 0))
+    )
+  
+  p1 <- ggplot(data_selected_cue_total,
+               aes(x = num_occurrences,
+                   y = after_stat(density),
+                   color = dyad_set)) +
+    geom_freqpoly(binwidth = 1, linetype = "solid") +
+    ylab("Proportion of dyads") +
+    xlim(0, NA) + 
+    xlab("Number of occurrences in feeding") +
+    ggtitle(selected_cue)
+  
+  p2 <- ggplot(data_selected_cue_total,
+               aes(x = num_occurrences,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Number of occurrences in feeding") +
+    ggtitle(selected_cue)
+  
+  grid.arrange(p1, p2, ncol = 2)
+  
+  t <- data_selected_cue_total %>% 
+    group_by(dyad_set) %>%
+    summarize_at(vars(num_occurrences),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 1))
+  cat('\n')
+    
+}
+
+```
+
+
+
+
+
+
+# On average, how many different *types* of cues do babies display at each age? Does this change over time?
+
+## Total number of types
+
+
+```{r}
+
+ggplot(data_cues_dyad_total,
+       aes(x = num_types,
+           y = after_stat(density),
+           color = dyad_set)) +
+  geom_freqpoly(binwidth = 1, linetype = "solid") +
+  ylab("Proportion of dyads") +
+  xlab("Number of different types of cues")
+
+```
+
+
+
+
+
+
+```{r}
+ggplot(cues_individual,
+       aes(x = min_num_types, y = max_num_types, shape = Bottle_Rejector)) +
+  geom_jitter(width = 0.1, height = 0.1) +
+  scale_shape_manual(values = c(1, 4)) +
+  geom_abline(intercept = 0, slope = 1, linetype = 2, color = "orange")
+
+```
+
+
+
+```{r}
+ggplot(cues_individual_all_times,
+       aes(x = id, y = num_types, col = dyad_set)) +
+  coord_flip() +
+  geom_jitter(aes(shape = Bottle_Rejector), width = 0, height = 0.1) +
+  scale_shape_manual(values = c(1, 4))
+```
+
+## Total number of *types* per video length
+
+
+
+```{r}
+ggplot(data_cues_dyad_total,
+       aes(x = num_types_per_length, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity")
+  
+ggplot(data_cues_dyad_total,
+       aes(x = dyad_set, y = num_types_per_length, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4))
+                 
+```
+
+
+
+```{r}
+
+data_cues_dyad_total %>% 
+  group_by(dyad_set) %>%
+  summarize_at(vars(num_types_per_length),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 3)
+
+```
+
+
+
+
+
+```{r}
+ggplot(cues_individual,
+       aes(x = min_types_per_length, y = max_types_per_length, shape = Bottle_Rejector)) +
+  geom_point() +
+  scale_shape_manual(values = c(1, 4)) +
+  geom_abline(intercept = 0, slope = 1, linetype = 2, color = "orange")
+
+```
+
+
+
+```{r}
+ggplot(cues_individual_all_times,
+       aes(x = id, y = num_types_per_length, col = dyad_set)) +
+  coord_flip() +
+  geom_point(aes(shape = Bottle_Rejector)) +
+  scale_shape_manual(values = c(1, 4))
+```
+
+
+
+
+
+

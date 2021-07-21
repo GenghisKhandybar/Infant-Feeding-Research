@@ -1,0 +1,222 @@
+---
+title: "mother-final-cues"
+author: "William Medwid"
+date: "7/7/2021"
+output: 
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+# Time-based analsis of mothers' cues
+
+## These are mirroring analyses of infant cues, so not all 
+
+```{r setup, include=FALSE}
+source("shared_setup.R")
+```
+
+```{r final_cues}
+final_cue <- data_duration %>% 
+  filter(dyad_unit == "Mom") %>% 
+  group_by(id, dyad_set) %>% 
+  slice_max(order_by=Time_Relative_sf, n=1) %>% 
+  mutate(time_before_end = video_length - end_time)
+
+last_cue_counts <- final_cue %>% 
+  group_by(dyad_set) %>% 
+  count(Behavior)
+  
+n_dyads <- last_cue_counts %>% group_by(dyad_set) %>% summarise(n_dyads = sum(n))
+
+#Creating proportion variable
+last_cue_counts <- last_cue_counts %>% 
+  left_join(n_dyads,
+    on=dyad_set) %>% 
+  mutate(prop_dyads = n/n_dyads)
+
+# Checksum for proportions
+#last_cue_counts %>% group_by(dyad_set) %>% summarise(n = sum(n), prop_sum = sum(prop_dyads))
+
+#Plot
+
+last_cue_counts %>% 
+  ggplot(aes(y=reorder(Behavior, desc(prop_dyads)), 
+             x=prop_dyads*100, 
+             fill = dyad_set)) +
+  geom_bar(stat="identity") +
+  facet_grid(cols = vars(dyad_set)) +
+  ylab("Final Satiation Cue") +
+  xlab("Percent of final cues") +
+  ggtitle("Mothers' final cue before end of session")+ 
+  theme(legend.position = "none") #The fill colors are purely aesthetic so the legend is removed.
+```
+
+Predictably, the large majority of sessions end with an indication that the session is over.
+
+```{r last_quarter}
+after_prop = 0.75
+
+near_final_cues =  data_duration %>% 
+  filter(dyad_unit == "Mom") %>% 
+  filter(Event_Type == "State point") %>% 
+  filter(start_fraction > after_prop) %>% 
+  distinct(Behavior, dyad_set, id) #Removes repeated cues from the same infant within the same feeding
+
+last_cue_counts <- near_final_cues %>% 
+  group_by(dyad_set) %>% 
+  count(Behavior)
+  
+#Creating proportion variable
+last_cue_counts <- last_cue_counts %>% 
+  left_join(n_dyads,
+            on=dyad_set) %>% 
+  mutate(pct_dyads = 100*n/n_dyads,
+         Behavior = reorder(Behavior, desc(pct_dyads)))
+
+# Table -----------
+
+verbose_props <- last_cue_counts %>% 
+  mutate(prop_dyads_verbose = paste(
+    round(pct_dyads, 2) %>% str_pad(width=4, side="right", pad="0"),
+    " (", n, "/", n_dyads, ")", sep = "")) %>% 
+  pivot_wider(names_from = dyad_set, 
+              values_from = prop_dyads_verbose, 
+              id_cols = Behavior)
+verbose_props %>% 
+  arrange(verbose_props %>% select("6moB")) %>% 
+  kable(caption="Proportion of infants displaying each cue in the last 25% of feeding")
+
+# Plot ----------
+
+p <- last_cue_counts %>% 
+  ggplot(aes(color=Behavior, 
+             group=Behavior,
+             y=pct_dyads, 
+             x = dyad_set)) +
+  geom_point() +
+  geom_line() +
+  ylab("Percent expressing cue") +
+  xlab("Dyad set") +
+  ggtitle("Mothers displaying cues at least once in the final 25% of feeding")
+
+p %>% 
+  ggplotly()
+```
+
+```{r distribution_plot}
+df_points <- data_duration %>% 
+  filter(dyad_unit == "Mom" & Event_Type == "State point") %>% 
+  filter(Behavior != "Indicates feeding is over")
+
+med_times <- df_points %>% 
+  group_by(Behavior) %>% 
+  summarise(med_time = median(start_fraction)) %>%
+  arrange(med_time) %>% 
+  pull(Behavior)
+
+df_points %>% 
+  ggplot(aes(y=factor(Behavior, levels=med_times), x=start_fraction*100)) +
+  geom_violin(aes(fill=dyad_set))+
+  geom_boxplot(width=0.2, outlier.shape = NA, coef = 0) +
+  facet_grid(cols = vars(dyad_set)) +
+  ylab("Behavior") +
+  xlab("Percent of feeding completed") +
+  ggtitle("Shape and center 50 percentile of cue Times") +
+  theme(legend.position = "none") #The fill colors are purely aesthetic so the legend is removed.
+```
+
+```{r distribution_table}
+#Table ---------------
+df_points <- data_duration %>% 
+  filter(dyad_unit == "Mom" & Event_Type == "State point")
+
+med_times <- df_points %>% 
+  group_by(Behavior) %>% 
+  summarise(med_time = median(start_fraction)) %>%
+  arrange(med_time) %>% 
+  pull(Behavior)
+
+
+
+df_points %>%
+  group_by(Behavior, dyad_set) %>%
+  summarise(q1 = quantile(start_fraction, 0.25), median = median(start_fraction), q3 = quantile(start_fraction, 0.75), n = n()) %>%
+  right_join(expand_grid(
+    Behavior =df_points$Behavior %>% unique(),
+    dyad_set = dyad_set_levels
+  )) %>%
+  kable(digits=2)
+```
+
+
+```{r}
+mother_narrow <- data_dyad_total_zeros %>% 
+  filter(dyad_unit == "Mom") %>% 
+  distinct(Narrow_group) %>% 
+  pull()
+
+for(behavior_type in mother_narrow){
+  p <- data_dyad_total_zeros %>%
+    filter(dyad_unit == "Mom") %>% 
+    filter(Narrow_group==behavior_type) %>% 
+    mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
+    #filter(num_per_min < 2) %>% 
+    ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
+    geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
+    ggtitle(paste(behavior_type, "behhavior frequency distributions by age")) + 
+    xlab("Cues per minute")
+  print(p)
+}
+```
+
+```{r}
+data_dyad_total_zeros %>%
+  filter(dyad_unit == "Mom") %>% 
+  filter(!(Behavior %in% bottle_states)) %>% 
+  group_by(dyad_set, id, Narrow_group) %>% 
+  summarise(sum_num_per_min = sum(num_per_min)) %>% 
+  mutate(Narrow_group = reorder(Narrow_group, sum_num_per_min, median)) %>% 
+  #filter(num_per_min < 2) %>% 
+  ggplot(aes(y=Narrow_group, x=sum_num_per_min, col=dyad_set)) +
+  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
+  ggtitle("Mothers' behhavior frequency distributions by behavior group") + 
+  xlab("Cues per minute")
+```
+
+```{r}
+states <- data_duration %>%
+  filter(dyad_unit == "Mom") %>% 
+  filter(!(Behavior %in% bottle_states)) %>% 
+  filter(Narrow_group!="Baseline") %>%
+  filter(Event_Type == "State start") %>% 
+  distinct(Behavior) %>% 
+  pull()
+
+
+total_fractions <- data_duration %>%
+  filter(Behavior %in% states) %>% 
+  filter(Event_Type == "State start") %>%
+  group_by(id, dyad_set, Behavior) %>% 
+  summarise(total_fraction = sum(duration_fraction))
+
+total_fractions <- total_fractions %>% 
+  expand(nesting(id, dyad_set), Behavior = states) %>%
+  left_join(total_fractions, on=c(id, dyad_set, Behavior)) %>%
+  replace_na(list(total_fraction = 0)) %>% 
+  group_by(Behavior, dyad_set) %>% 
+  summarise(mean_fraction = mean(total_fraction))
+
+  
+#total_fractions %>% group_by(dyad_set) %>% summarise(s = sum(mean_fraction))
+
+p <- total_fractions %>% 
+  ggplot(aes(x=dyad_set, y=mean_fraction, group=Behavior, color=Behavior)) +
+  geom_path() + 
+  ylab("Mean Fraction of Time in State") +
+  xlab("Dyad Set") +
+  ggtitle("Proportion of time exhibiting certain behaviors")
+
+p %>% ggplotly()
+```
+

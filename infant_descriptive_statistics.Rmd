@@ -1,0 +1,212 @@
+---
+title: "infant_descriptive_statistics"
+author: "William Medwid"
+date: "7/9/2021"
+output: 
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+```{r, include=FALSE}
+source("shared_setup.R")
+```
+
+
+# Cues over the whole duration
+
+<!-- ## Proportion of dyads that express the cue at least once during feeding, by age -->
+
+<!-- ```{r} -->
+<!-- n_dyads <- data_duration %>%  -->
+<!--   distinct(id, dyad_set) %>%  -->
+<!--   count(dyad_set) %>%  -->
+<!--   rename(n_dyads = n) -->
+<!--   #mutate(n_dyads = n) %>%  -->
+<!--   #select(!n) -->
+
+<!-- behavior_props <- data_duration %>% -->
+<!--   filter(Event_Type == "State point") %>% -->
+<!--   filter(dyad_unit == "Baby") %>%  -->
+<!--   distinct(Behavior, id, dyad_set) %>%  -->
+<!--   group_by(dyad_set) %>%  -->
+<!--   count(Behavior) %>%  -->
+<!--   left_join(n_dyads, on=dyad_set) %>%  -->
+<!--   mutate(prop_shown = n/n_dyads) -->
+
+
+<!-- behavior_props %>%  -->
+<!--   ggplot(aes(y=Behavior, x=prop_shown, fill=dyad_set)) + -->
+<!--   geom_bar(stat="identity") + -->
+<!--   facet_grid(cols = vars(dyad_set)) + -->
+<!--   xlim(0, 1) +  -->
+<!--   theme(legend.position = "none")+ #The fill colors are purely aesthetic so the legend is removed. -->
+<!--   xlab("Proportion of infants that express the cue") + -->
+<!--   ylab("Infant cue") + -->
+<!--   ggtitle("Proportion of infants that express cue\n at least once during feeding") -->
+<!-- ``` -->
+
+## Proportion of time in which behaviors are visible
+
+
+
+```{r}
+time_plot <- function(states){
+  total_fractions <- data_duration %>%
+    filter(Behavior %in% states) %>% 
+    filter(Event_Type == "State start") %>%
+    group_by(id, dyad_set, Behavior) %>% 
+    summarise(total_fraction = sum(duration_fraction))
+  
+  total_fractions <- total_fractions %>% 
+    expand(nesting(id, dyad_set), Behavior = states) %>%
+    left_join(total_fractions, on=c(id, dyad_set, Behavior)) %>%
+    replace_na(list(total_fraction = 0)) %>% 
+    group_by(Behavior, dyad_set) %>% 
+    summarise(mean_fraction = mean(total_fraction))
+  
+    
+  #total_fractions %>% group_by(dyad_set) %>% summarise(s = sum(mean_fraction))
+  
+  total_fractions %>% 
+    ggplot(aes(x=dyad_set, y=mean_fraction, group=Behavior, color=Behavior)) +
+    geom_path() + 
+    ylab("Mean Fraction of Time in State") +
+    xlab("Dyad Set") +
+    ggtitle("Proportion of time exhibiting certain behaviors") %>% 
+    return()
+}
+
+related <- list(
+  c("Bottle not in mouth", "Bottle in mouth", "Bottle offered"),
+  c("Crying", "Not Crying"),
+  c("Eyes Closed", "Eyes Open"))
+
+for (states in related){
+  print(time_plot(states))
+}
+```
+
+
+
+
+```{r}
+df_points <- data_duration %>% 
+  filter(dyad_unit == "Baby" & Event_Type == "State point")
+
+med_times <- df_points %>% 
+  group_by(Narrow_group) %>% 
+  summarise(med_time = median(start_fraction)) %>%
+  arrange(med_time) %>% 
+  pull(Narrow_group)
+
+df_points %>% 
+  ggplot(aes(y=factor(Narrow_group, levels=med_times), x=start_fraction*100)) +
+  geom_violin()+
+  geom_boxplot(width=0.2, outlier.shape = NA, coef = 0) +
+  facet_grid(cols = vars(dyad_set)) +
+  ylab("Cue Type") +
+  xlab("Percent of feeding completed") +
+  ggtitle("Shape and center 50 percentile of cue Times")
+
+df_points %>% 
+  group_by(Narrow_group, dyad_set) %>% 
+  summarise(mean=mean(start_fraction),
+            sd = sd(start_fraction)) %>% 
+  mutate(readout = paste("Mean: ", round(mean, 2), "SD: ", round(sd, 2))) %>% 
+  pivot_wider(names_from = Narrow_group, values_from=readout, id_cols=dyad_set) %>% 
+  kable(caption = "Mean and standard deviation of average cues for potent and subtle cues")
+```
+
+```{r}
+p <- data_dyad_total_zeros %>% 
+  mutate(any_occurances = if_else(num_occurrences>0, 1, 0)) %>% 
+  filter(dyad_unit=="Baby") %>% 
+  filter(Narrow_group!="Baseline") %>% 
+  group_by(Behavior, dyad_set, Narrow_group) %>% 
+  summarise(prop_occurances = round(mean(any_occurances), 2)) %>% 
+  ggplot(aes(x=dyad_set, 
+             y=prop_occurances, 
+             color=Behavior,
+             group=Behavior)) +
+  geom_point()+
+  geom_line() +
+  facet_grid(cols=vars(Narrow_group)) +
+  ggtitle("Proportion of infants expressing cues") +
+  ylab("Proportion expressing cue at least once") +
+  xlab("Baby age")
+
+p %>% ggplotly()
+  
+```
+
+
+
+## Distributions of cues per minute
+```{r}
+
+p <- data_dyad_total_zeros %>% 
+  filter(dyad_unit=="Baby") %>% 
+  filter(Narrow_group!="Baseline") %>% 
+  group_by(Behavior, dyad_set, Narrow_group) %>% 
+  summarise(mean_per_min = round(mean(num_per_min), 2)) %>% 
+  ggplot(aes(x=dyad_set, 
+             y=mean_per_min, 
+             color=Behavior,
+             group=Behavior)) +
+  geom_point()+
+  geom_line() +
+  facet_grid(cols=vars(Narrow_group)) +
+  ggtitle("Overall cue frequencies") +
+  ylab("Average expressions per minute") +
+  xlab("Baby age")
+
+p %>% ggplotly()
+```
+
+# Cues/min analysis
+
+```{r}
+outliers_over <- 2
+
+data_dyad_total_zeros %>%
+  filter(dyad_unit == "Baby") %>% 
+  filter(Narrow_group=="Potent") %>% 
+  #filter(Narrow_group!="Baseline") %>% 
+  mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
+  filter(num_per_min < 2) %>% 
+  ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
+  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
+  ggtitle("Potent behhavior frequency distributions by age",
+          subtitle = "Outliers above 2 shown below") + 
+  xlab("Cues per minute") +
+  xlim(0,outliers_over)
+
+data_dyad_total_zeros %>%
+  filter(dyad_unit == "Baby") %>% 
+  filter(Narrow_group=="Subtle") %>% 
+  #filter(Narrow_group!="Baseline") %>% 
+  mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
+  filter(num_per_min < 2) %>% 
+  ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
+  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
+  ggtitle("Subtle behhavior frequency distributions by age",
+          subtitle = "Outliers above 2 shown below") + 
+  xlab("Cues per minute") +
+  xlim(0,outliers_over)
+
+data_dyad_total_zeros %>%
+  filter(dyad_unit == "Baby") %>% 
+  filter(Narrow_group!="Baseline") %>% 
+  mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
+  filter(num_per_min > 2) %>% 
+  ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set, group=dyad_set)) +
+
+  geom_point(alpha = 0.75, size=2, position=position_dodge(width=0.75))+
+  ggtitle("Outliers from previous 2 charts (above 2)") +
+  xlim(2, NA)
+```
+
+
+
+
