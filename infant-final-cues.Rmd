@@ -160,7 +160,7 @@ This table reflects the previous chart, aggregated over the 4 dyad age groups. T
 ```{r last_quarter}
 after_prop = 0.75
 
-near_final_cues =  data_duration %>% 
+near_final_cues <-  data_duration %>% 
   filter(dyad_unit == "Baby") %>% 
   filter(Grouped_behavior == "Infant Satiation Cues") %>%  
   #filter(Event_Type == "State point") %>% 
@@ -176,7 +176,8 @@ last_cue_counts <- last_cue_counts %>%
   left_join(n_dyads,
             on=dyad_set) %>% 
   mutate(prop_dyads = n/n_dyads,
-         Behavior = reorder(Behavior, desc(prop_dyads)))
+         Behavior = reorder(Behavior, desc(prop_dyads))) %>% 
+  mutate(pct_dyads = prop_dyads*100)
 
 # Table -----------
 
@@ -193,16 +194,42 @@ verbose_props %>%
 
 # Plot ----------
 
+Subtle_behaviors <- behavior_codebook %>%
+  filter(Narrow_group == "Subtle") %>%  
+  pull(Behavior)
+
+Potent_behaviors <- behavior_codebook %>%
+  filter(Narrow_group == "Potent") %>%  
+  pull(Behavior)
+
 p <- last_cue_counts %>% 
+  filter(Behavior %in% Subtle_behaviors) %>% 
   ggplot(aes(color=Behavior, 
              group=Behavior,
-             y=prop_dyads*100, 
+             y=pct_dyads, 
              x = dyad_set)) +
   geom_point() +
   geom_line() +
   ylab("Percent expressing cue") +
   xlab("Dyad set") +
-  ggtitle("Infants displaying cues at least once in the final 25% of feeding")
+  ggtitle("Infants displaying cues at least once in the final 25% of feeding",
+          subtitle = "Subtle cues")
+
+p %>% 
+  ggplotly()
+
+p <- last_cue_counts %>% 
+  filter(Behavior %in% Potent_behaviors) %>% 
+  ggplot(aes(color=Behavior, 
+             group=Behavior,
+             y=pct_dyads, 
+             x = dyad_set)) +
+  geom_point() +
+  geom_line() +
+  ylab("Percent expressing cue") +
+  xlab("Dyad set") +
+  ggtitle("Infants displaying cues at least once in the final 25% of feeding",
+          subtitle = "Potent cues")
 
 p %>% 
   ggplotly()
