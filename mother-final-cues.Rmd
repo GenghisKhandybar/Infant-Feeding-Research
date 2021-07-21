@@ -8,9 +8,7 @@ output:
     highlight: github
 ---
 
-# Time-based analsis of mothers' cues
-
-## These are mirroring analyses of infant cues, so not all 
+# Time-based analsis of mothers' behaviors
 
 ```{r setup, include=FALSE}
 source("shared_setup.R")
@@ -46,9 +44,9 @@ last_cue_counts %>%
              fill = dyad_set)) +
   geom_bar(stat="identity") +
   facet_grid(cols = vars(dyad_set)) +
-  ylab("Final Satiation Cue") +
-  xlab("Percent of final cues") +
-  ggtitle("Mothers' final cue before end of session")+ 
+  ylab("Final behavior") +
+  xlab("Percent of final behaviors") +
+  ggtitle("Mothers' final behaviors before end of session")+ 
   theme(legend.position = "none") #The fill colors are purely aesthetic so the legend is removed.
 ```
 
@@ -85,7 +83,7 @@ verbose_props <- last_cue_counts %>%
               id_cols = Behavior)
 verbose_props %>% 
   arrange(verbose_props %>% select("6moB")) %>% 
-  kable(caption="Proportion of infants displaying each cue in the last 25% of feeding")
+  kable(caption="Proportion of mothers displaying each behavior in the last 25% of feeding")
 
 # Plot ----------
 
@@ -96,9 +94,9 @@ p <- last_cue_counts %>%
              x = dyad_set)) +
   geom_point() +
   geom_line() +
-  ylab("Percent expressing cue") +
+  ylab("Percent expressing behavior") +
   xlab("Dyad set") +
-  ggtitle("Mothers displaying cues at least once in the final 25% of feeding")
+  ggtitle("Mothers displaying behaviors at least once in the final 25% of feeding")
 
 p %>% 
   ggplotly()
@@ -122,7 +120,7 @@ df_points %>%
   facet_grid(cols = vars(dyad_set)) +
   ylab("Behavior") +
   xlab("Percent of feeding completed") +
-  ggtitle("Shape and center 50 percentile of cue Times") +
+  ggtitle("Shape and center 50 percentile of behavior times") +
   theme(legend.position = "none") #The fill colors are purely aesthetic so the legend is removed.
 ```
 
@@ -165,7 +163,7 @@ for(behavior_type in mother_narrow){
     ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
     geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
     ggtitle(paste(behavior_type, "behavior frequency distributions by age")) + 
-    xlab("Cues per minute")
+    xlab("Behaviors per minute")
   print(p)
 }
 ```
@@ -181,7 +179,7 @@ data_dyad_total_zeros %>%
   ggplot(aes(y=Narrow_group, x=sum_num_per_min, col=dyad_set)) +
   geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
   ggtitle("Mothers' behavior frequency distributions by behavior group") + 
-  xlab("Cues per minute")
+  xlab("Behaviors per minute")
 ```
 
 ```{r}
