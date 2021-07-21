@@ -40,3 +40,7 @@ vignettes/*.pdf
 
 # Remove data files
 *.csv
+
+# Hide HTML files - these are private for now
+
+*.html
