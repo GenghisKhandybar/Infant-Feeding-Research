@@ -164,7 +164,7 @@ for(behavior_type in mother_narrow){
     #filter(num_per_min < 2) %>% 
     ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
     geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-    ggtitle(paste(behavior_type, "behhavior frequency distributions by age")) + 
+    ggtitle(paste(behavior_type, "behavior frequency distributions by age")) + 
     xlab("Cues per minute")
   print(p)
 }
@@ -180,7 +180,7 @@ data_dyad_total_zeros %>%
   #filter(num_per_min < 2) %>% 
   ggplot(aes(y=Narrow_group, x=sum_num_per_min, col=dyad_set)) +
   geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-  ggtitle("Mothers' behhavior frequency distributions by behavior group") + 
+  ggtitle("Mothers' behavior frequency distributions by behavior group") + 
   xlab("Cues per minute")
 ```
 
