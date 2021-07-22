@@ -109,10 +109,11 @@ final_cue %>%
     q3 = quantile(time_before_end, 0.75), 
     max=max(time_before_end), 
     mean = mean(time_before_end),
-    sd = sd(time_before_end)
+    sd = sd(time_before_end),
+    n_obsersvations = n()
   ) %>% 
   arrange(median) %>% 
-  kable(digits=2, caption="Final cues: How long each happens before feeding ends")
+  kable(digits=2, caption="Final cues: How many seconds each happens before feeding ends")
 ```
 
 This table reflects the previous chart, aggregated over the 4 dyad age groups. The precise mean and median values may have been hard to discern from the plot, so they're shown in the table here.
