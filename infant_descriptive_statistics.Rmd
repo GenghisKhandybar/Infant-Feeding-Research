@@ -140,9 +140,8 @@ p %>% ggplotly()
   
 ```
 
-
-
 ## Distributions of cues per minute
+
 ```{r}
 
 p <- data_dyad_total_zeros %>% 
@@ -166,45 +165,45 @@ p %>% ggplotly()
 
 # Cues/min analysis
 
-```{r}
-outliers_over <- 2
+```{r cues_min_analysis}
+#Commented out code separates outliers into a third plot, allowing easier comparisons.
+
+#outliers_over <- 2
 
 data_dyad_total_zeros %>%
   filter(dyad_unit == "Baby") %>% 
   filter(Narrow_group=="Potent") %>% 
-  #filter(Narrow_group!="Baseline") %>% 
   mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-  filter(num_per_min < 2) %>% 
+  #filter(num_per_min < 2) %>% 
   ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
   geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
   ggtitle("Potent behhavior frequency distributions by age",
           subtitle = "Outliers above 2 shown below") + 
-  xlab("Cues per minute") +
-  xlim(0,outliers_over)
+  xlab("Cues per minute")# +
+  #xlim(0,outliers_over)
 
 data_dyad_total_zeros %>%
   filter(dyad_unit == "Baby") %>% 
   filter(Narrow_group=="Subtle") %>% 
-  #filter(Narrow_group!="Baseline") %>% 
   mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-  filter(num_per_min < 2) %>% 
+  #filter(num_per_min < 2) %>% 
   ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
   geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
   ggtitle("Subtle behhavior frequency distributions by age",
           subtitle = "Outliers above 2 shown below") + 
-  xlab("Cues per minute") +
-  xlim(0,outliers_over)
+  xlab("Cues per minute")# +
+  #xlim(0,outliers_over)
 
-data_dyad_total_zeros %>%
-  filter(dyad_unit == "Baby") %>% 
-  filter(Narrow_group!="Baseline") %>% 
-  mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-  filter(num_per_min > 2) %>% 
-  ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set, group=dyad_set)) +
-
-  geom_point(alpha = 0.75, size=2, position=position_dodge(width=0.75))+
-  ggtitle("Outliers from previous 2 charts (above 2)") +
-  xlim(2, NA)
+# data_dyad_total_zeros %>%
+#   filter(dyad_unit == "Baby") %>% 
+#   filter(Narrow_group!="Baseline") %>% 
+#   mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
+#   filter(num_per_min > 2) %>% 
+#   ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set, group=dyad_set)) +
+# 
+#   geom_point(alpha = 0.75, size=2, position=position_dodge(width=0.75))+
+#   ggtitle("Outliers from previous 2 charts (above 2)") +
+#   xlim(2, NA)
 ```
 
 
