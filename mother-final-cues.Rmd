@@ -15,6 +15,7 @@ This analysis excludes bottle rejectors.
 ## Useful in assessing to what degree some behaviors may be associated with the time in feeding.
 
 ```{r setup, include=FALSE}
+include_rejectors <- c(0)
 source("shared_setup.R")
 ```
 

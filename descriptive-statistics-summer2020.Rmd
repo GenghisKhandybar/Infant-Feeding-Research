@@ -13,6 +13,7 @@ This analysis excludes bottle rejectors.
 <!-- # Setup -->
 
 ```{r setup, include=FALSE}
+include_rejectors <- c(0)
 source("shared_setup.R")
 ```
 

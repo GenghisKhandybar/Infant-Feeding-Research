@@ -10,10 +10,10 @@ output:
 
 This analysis excludes bottle rejectors.
 
-```{r, include=FALSE}
+```{r setup, include=FALSE}
+include_rejectors <- c(0)
 source("shared_setup.R")
 ```
-
 
 # Cues over the whole duration
 
