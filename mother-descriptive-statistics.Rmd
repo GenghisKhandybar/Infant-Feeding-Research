@@ -29,6 +29,8 @@ for(behavior_type in mother_narrow){
 }
 ```
 
+In these plots, everything is treated as a state point behavior. Maybe it'd be more useful to separate the duration behaviors, but here we get a more direct comparison.
+
 ```{r}
 data_dyad_total_zeros %>%
   filter(dyad_unit == "Mom") %>% 
@@ -42,6 +44,8 @@ data_dyad_total_zeros %>%
   ggtitle("Mothers' behavior frequency distributions by behavior group") + 
   xlab("Behaviors per minute")
 ```
+
+The main trends we can see are, encouragement is more often used on younger babies while responsive behavior is more often given to older infants.
 
 ```{r}
 states <- data_duration %>%
@@ -79,3 +83,33 @@ p <- total_fractions %>%
 
 p %>% ggplotly()
 ```
+
+This confirms expected trends of more mature behaviors increasing over time while burping decreases. Each of these are very small fractions of the feeding time, but still significant.
+
+```{r}
+line_plot <- function(group){
+  p <- data_dyad_total_zeros %>% 
+    mutate(any_occurances = if_else(num_occurrences>0, 1, 0)) %>% 
+    filter(Wide_group==group) %>% 
+    group_by(Behavior, dyad_set, Narrow_group) %>% 
+    summarise(prop_occurances = round(mean(any_occurances), 2)) %>% 
+    ggplot(aes(x=dyad_set, 
+               y=prop_occurances, 
+               color=Behavior,
+               group=Behavior)) +
+    geom_point()+
+    geom_line() +
+    ylim(0, 1) +
+    ggtitle(paste("Proportion of mothers performing", group, "actions")) +
+    ylab("Proportion expressing cue at least once") +
+    xlab("Baby age")
+  
+  p %>% ggplotly()
+}
+
+line_plot("Responsive")
+line_plot("Controlling")
+line_plot("Uninvolved")
+```
+
+One unusual finding here is that among four behaviors(3 controlling, one responsive), there is a sharp decrease in frequency from 2 months to 4 months, then a rebound at 6 months. Any ideas why this might be?
