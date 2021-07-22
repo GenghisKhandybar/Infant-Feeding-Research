@@ -119,48 +119,55 @@ df_points %>%
 ```
 
 ```{r}
-p <- data_dyad_total_zeros %>% 
-  mutate(any_occurances = if_else(num_occurrences>0, 1, 0)) %>% 
-  filter(dyad_unit=="Baby") %>% 
-  filter(Narrow_group!="Baseline") %>% 
-  group_by(Behavior, dyad_set, Narrow_group) %>% 
-  summarise(prop_occurances = round(mean(any_occurances), 2)) %>% 
-  ggplot(aes(x=dyad_set, 
-             y=prop_occurances, 
-             color=Behavior,
-             group=Behavior)) +
-  geom_point()+
-  geom_line() +
-  facet_grid(cols=vars(Narrow_group)) +
-  ggtitle("Proportion of infants expressing cues") +
-  ylab("Proportion expressing cue at least once") +
-  xlab("Baby age")
-
-p %>% ggplotly()
+line_plot <- function(group){
+  p <- data_dyad_total_zeros %>% 
+    mutate(any_occurances = if_else(num_occurrences>0, 1, 0)) %>% 
+    filter(dyad_unit=="Baby") %>% 
+    filter(Narrow_group==group) %>% 
+    group_by(Behavior, dyad_set, Narrow_group) %>% 
+    summarise(prop_occurances = round(mean(any_occurances), 2)) %>% 
+    ggplot(aes(x=dyad_set, 
+               y=prop_occurances, 
+               color=Behavior,
+               group=Behavior)) +
+    geom_point()+
+    geom_line() +
+    ylim(0, 1) +
+    ggtitle("Proportion of infants expressing cues") +
+    ylab("Proportion expressing cue at least once") +
+    xlab("Baby age")
   
+  p %>% ggplotly()
+}
+
+line_plot("Potent")
+line_plot("Subtle")
 ```
 
 ## Distributions of cues per minute
 
 ```{r}
-
-p <- data_dyad_total_zeros %>% 
-  filter(dyad_unit=="Baby") %>% 
-  filter(Narrow_group!="Baseline") %>% 
-  group_by(Behavior, dyad_set, Narrow_group) %>% 
-  summarise(mean_per_min = round(mean(num_per_min), 2)) %>% 
-  ggplot(aes(x=dyad_set, 
-             y=mean_per_min, 
-             color=Behavior,
-             group=Behavior)) +
-  geom_point()+
-  geom_line() +
-  facet_grid(cols=vars(Narrow_group)) +
-  ggtitle("Overall cue frequencies") +
-  ylab("Average expressions per minute") +
-  xlab("Baby age")
-
-p %>% ggplotly()
+line_plot <- function(group){
+  p <- data_dyad_total_zeros %>% 
+    filter(dyad_unit=="Baby") %>% 
+    filter(Narrow_group==group) %>% 
+    group_by(Behavior, dyad_set, Narrow_group) %>% 
+    summarise(mean_per_min = round(mean(num_per_min), 2)) %>% 
+    ggplot(aes(x=dyad_set, 
+               y=mean_per_min, 
+               color=Behavior,
+               group=Behavior)) +
+    geom_point()+
+    geom_line() +
+    ylim(0,0.6)+
+    ggtitle(paste("Overall", group, "cue frequencies")) +
+    ylab("Average expressions per minute") +
+    xlab("Baby age")
+  
+  p %>% ggplotly()
+}
+line_plot("Potent")
+line_plot("Subtle")
 ```
 
 # Cues/min analysis
