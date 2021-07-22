@@ -86,13 +86,9 @@ verbose_props %>%
   kable(caption="Proportion of mothers displaying each behavior in the last 25% of feeding")
 
 # Plot ----------
-mom_groups <- behavior_codebook %>%
-  filter(dyad_unit=="Mom") %>% 
-  filter(Event_Type == "State point") %>% 
-  distinct(Wide_group) %>% 
-  pull()
 
-for(group in mom_groups){
+#This was originally done with a loop, but plotly doesn't plot within loops.
+line_plot <- function(group){
   behaviors <- behavior_codebook %>% filter(Wide_group == group) %>% pull(Behavior)
 
   p <- last_cue_counts %>% 
@@ -110,10 +106,13 @@ for(group in mom_groups){
   
   p %>% 
     ggplotly() %>% 
-    print()
+    return()
 }
-
+line_plot("Controlling")
+line_plot("Responsive")
 ```
+
+Responsive behaviors in the final quarter appear about constant, while some controlling behaviors become less common.
 
 ```{r distribution_plot}
 df_points <- data_duration %>% 
