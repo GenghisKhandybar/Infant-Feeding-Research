@@ -219,9 +219,10 @@ p <- last_cue_counts %>%
              x = dyad_set)) +
   geom_point() +
   geom_line() +
+  ylim(0,100) +
   ylab("Percent expressing cue") +
   xlab("Dyad set") +
-  ggtitle("Infants displaying cues at least once in the final 25% of feeding",
+  ggtitle("Infants displaying potent cues at least once in the final 25% of feeding",
           subtitle = "Subtle cues")
 
 p %>% 
@@ -238,7 +239,7 @@ p <- last_cue_counts %>%
   ylim(0,100) +
   ylab("Percent expressing cue") +
   xlab("Dyad set") +
-  ggtitle("Infants displaying cues at least once in the final 25% of feeding",
+  ggtitle("Infants displaying subtle cues at least once in the final 25% of feeding",
           subtitle = "Potent cues")
 
 p %>% 
