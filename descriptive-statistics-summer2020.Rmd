@@ -8,6 +8,8 @@ output:
     highlight: github
 ---
 
+This analysis excludes bottle rejectors.
+
 <!-- # Setup -->
 
 ```{r setup, include=FALSE}
@@ -15,25 +17,6 @@ source("shared_setup.R")
 ```
 
 <!-- # Data  -->
-
-```{r data}
-data <- read_csv("data.csv") %>% 
-  # rename("id" = "ID_Number",
-  #        "coder_id" = "Coder") %>%
-  mutate(
-    Time_Relative_sf = as.double(Time_Relative_sf),
-    Duration_sf = as.double(Duration_sf),
-    Comment = as.logical(Comment),
-    id = factor(id),
-    Position_of_Infant = as.integer(Position_of_Infant),
-    time = as.double(time),
-    duration = as.double(duration),
-    dyad_set = factor(dyad_set, levels = dyad_set_levels),
-    Bottle_Rejector = replace_na(Bottle_Rejector, 0),
-    Bottle_Rejector = factor(Bottle_Rejector)
-  ) %>% 
-  mutate(Behavior = replace(Behavior, Behavior == "Blocks mouth", "Blocks mouth with hands or feet"))
-```
 
 ```{r n_dyads}
 n_dyads <- data %>%
@@ -241,49 +224,49 @@ bottle_in_mouth_bouts_last_cue <- bottle_bouts_last_cue %>%
   filter(Bottle_state == "Bottle in mouth")
 ```
 
-1. Just look at Eyes Closed and Crying as relevant cues, for now is it possible to treat them as point behaviors ? 
+<!-- 1. Just look at Eyes Closed and Crying as relevant cues, for now is it possible to treat them as point behaviors ?  -->
 
-2. Most relevant during bottle - in - mouth : 
+<!-- 2. Most relevant during bottle - in - mouth :  -->
 
-a. Bites or chews nipple 
+<!-- a. Bites or chews nipple  -->
 
-b. Displays negative facial expression 
+<!-- b. Displays negative facial expression  -->
 
-c. Pushes nipple out with tongue
+<!-- c. Pushes nipple out with tongue -->
 
-3. Most relevant during bottle - offered : 
+<!-- 3. Most relevant during bottle - offered :  -->
 
-a. Blocks mouth with hands
+<!-- a. Blocks mouth with hands -->
 
-b. Lip compression/does not open mouth
+<!-- b. Lip compression/does not open mouth -->
 
-4. Relevant during all bottle states:
+<!-- 4. Relevant during all bottle states: -->
 
-a. Drools, spits out milk, spits up
+<!-- a. Drools, spits out milk, spits up -->
 
-b. Gags, coughs, chokes
+<!-- b. Gags, coughs, chokes -->
 
-c. Lean s away/arches back (esp. during bottle -in-mouth and bottle-offered)
+<!-- c. Lean s away/arches back (esp. during bottle -in-mouth and bottle-offered) -->
 
-d. Pushes bottle away (esp. during bottle-in-mouth and bottle-offered)
+<!-- d. Pushes bottle away (esp. during bottle-in-mouth and bottle-offered) -->
 
-e.
-Shakes head or turns head or body away
-(esp. during
-bottle
--
-in
--
-mouth
-and
-bottle
--
-offered
-)
-f.
-Eyes Closed
-g.
-Crying
+<!-- e. -->
+<!-- Shakes head or turns head or body away -->
+<!-- (esp. during -->
+<!-- bottle -->
+<!-- - -->
+<!-- in -->
+<!-- - -->
+<!-- mouth -->
+<!-- and -->
+<!-- bottle -->
+<!-- - -->
+<!-- offered -->
+<!-- ) -->
+<!-- f. -->
+<!-- Eyes Closed -->
+<!-- g. -->
+<!-- Crying -->
 
 
 

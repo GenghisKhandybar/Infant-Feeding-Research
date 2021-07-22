@@ -5,6 +5,8 @@ date: "7/22/2021"
 output: html_document
 ---
 
+This analysis excludes bottle rejectors.
+
 ```{r setup, include=FALSE}
 source("shared_setup.R")
 ```

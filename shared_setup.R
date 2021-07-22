@@ -30,6 +30,11 @@ knitr::opts_chunk$set(echo = FALSE,
                       message = FALSE,
                       warning = FALSE)
 
+# Load data and select non-rejectors c(0), rejectors c(1), or all c(0, 1)
+
+if(!exists("include_rejectors")) #Default to only accept non-rejectors
+  include_rejectors <- c(0)
+
 # Reading data_duration -------------------------------------------------------
 
 data_duration <- read.csv("data_duration.csv")
@@ -37,16 +42,35 @@ data_duration <- read.csv("data_duration.csv")
 dyad_set_levels <- c("2wkB", "2moB", "4moB", "6moB")
 n_time_points = length(dyad_set_levels) # Not sure if this is used, but it's here to make sure there's no problems
 
-data_duration <- data_duration %>% mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels))
+data_duration <- data_duration %>% 
+  mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels)) %>%
+  filter(Bottle_Rejector %in% include_rejectors)
 
 attr(data_duration$Time_Relative_sf, "label") = "Seconds into feeding"
 
+# Reading data (used in descriptive-statistics-summer2020) -------------------
+
+data <- read_csv("data.csv") %>% 
+  # rename("id" = "ID_Number",
+  #        "coder_id" = "Coder") %>%
+  mutate(
+    Time_Relative_sf = as.double(Time_Relative_sf),
+    Duration_sf = as.double(Duration_sf),
+    Comment = as.logical(Comment),
+    id = factor(id),
+    Position_of_Infant = as.integer(Position_of_Infant),
+    time = as.double(time),
+    duration = as.double(duration),
+    dyad_set = factor(dyad_set, levels = dyad_set_levels),
+    Bottle_Rejector = replace_na(Bottle_Rejector, 0),
+    Bottle_Rejector = factor(Bottle_Rejector)
+  ) %>% 
+  mutate(Behavior = replace(Behavior, Behavior == "Blocks mouth", "Blocks mouth with hands or feet")) %>% 
+  filter(Bottle_Rejector %in% include_rejectors)
+
 # Reading data_dyad_total_zeros ----------------------------------------------------
 
-# Load data and select non-rejectors c(0), rejectors c(1), or all c(0, 1)
 
-if(!exists("include_rejectors")) #Default to only accept non-rejectors
-  include_rejectors <- c(0)
 
 data_dyad_total_zeros <- read_csv("data-dyad-total-zeros.csv") %>%
   mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels),

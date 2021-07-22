@@ -8,6 +8,8 @@ output:
     highlight: github
 ---
 
+This analysis excludes bottle rejectors.
+
 ```{r, include=FALSE}
 source("shared_setup.R")
 ```

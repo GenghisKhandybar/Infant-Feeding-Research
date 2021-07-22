@@ -8,6 +8,8 @@ output:
     highlight: github
 ---
 
+This analysis excludes bottle rejectors.
+
 # Time-based analsis of mothers' behaviors
 
 ## Useful in assessing to what degree some behaviors may be associated with the time in feeding.

@@ -7,8 +7,10 @@ output:
     theme: cayman
     highlight: github
 ---
+This analysis excludes bottle rejectors.
 
 # Analysis of the last cues an infant gives before feeding ends.
+
 
 ```{r setup, include=FALSE}
 source("shared_setup.R")
@@ -354,38 +356,38 @@ near_final_cues %>%
 ## Diagnostics
 
 ```{r}
-test_states <- c("Bottle not in mouth", "Bottle in mouth", "Bottle offered")
-test_states <- c("Crying", "Not Crying")
-test_states <- c("Eyes Closed", "Eyes Open")
-
-total_fractions <- data_duration %>%
-  filter(Behavior %in% test_states) %>% 
-  filter(Event_Type == "State start") %>%
-  group_by(id, dyad_set, Behavior) %>% 
-  summarise(total_fraction = sum(duration_fraction))
-
-crying_props <- total_fractions %>% 
-  pivot_wider(names_from=dyad_set, values_from =total_fraction) %>% 
-  group_by(id) %>% 
-  summarise_at(dyad_set_levels, sum) 
-
-#Sum of bottle in mouth fraction time + bottle not in mouth time
-crying_props %>% arrange(crying_props$"4moB")
-
-# Multiple times such as the 54.3198 time_relative_sf + duration_sf do not line up with the start of the next state.
-data_duration %>% 
-  filter(id=="70352") %>% 
-  filter(dyad_set == "4moB") %>% 
-  filter(Behavior %in% test_states) %>% 
-  mutate(next_state_expected = Time_Relative_sf + Duration_sf) %>% 
-  select(id, dyad_set, Time_Relative_sf, Duration_sf, next_state_expected, Behavior)
-  
-  
-data_duration %>% 
-  filter(id=="70352") %>% 
-  filter(dyad_set == "4moB") %>% 
-  filter(Behavior %in% test_states) %>% 
-  select(duration_fraction) %>% 
-  sum()
+# test_states <- c("Bottle not in mouth", "Bottle in mouth", "Bottle offered")
+# test_states <- c("Crying", "Not Crying")
+# test_states <- c("Eyes Closed", "Eyes Open")
+# 
+# total_fractions <- data_duration %>%
+#   filter(Behavior %in% test_states) %>% 
+#   filter(Event_Type == "State start") %>%
+#   group_by(id, dyad_set, Behavior) %>% 
+#   summarise(total_fraction = sum(duration_fraction))
+# 
+# crying_props <- total_fractions %>% 
+#   pivot_wider(names_from=dyad_set, values_from =total_fraction) %>% 
+#   group_by(id) %>% 
+#   summarise_at(dyad_set_levels, sum) 
+# 
+# #Sum of bottle in mouth fraction time + bottle not in mouth time
+# crying_props %>% arrange(crying_props$"4moB")
+# 
+# # Multiple times such as the 54.3198 time_relative_sf + duration_sf do not line up with the start of the next state.
+# data_duration %>% 
+#   filter(id=="70352") %>% 
+#   filter(dyad_set == "4moB") %>% 
+#   filter(Behavior %in% test_states) %>% 
+#   mutate(next_state_expected = Time_Relative_sf + Duration_sf) %>% 
+#   select(id, dyad_set, Time_Relative_sf, Duration_sf, next_state_expected, Behavior)
+#   
+#   
+# data_duration %>% 
+#   filter(id=="70352") %>% 
+#   filter(dyad_set == "4moB") %>% 
+#   filter(Behavior %in% test_states) %>% 
+#   select(duration_fraction) %>% 
+#   sum()
 ```
 
