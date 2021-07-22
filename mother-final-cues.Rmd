@@ -143,21 +143,13 @@ df_points %>%
 df_points <- data_duration %>% 
   filter(dyad_unit == "Mom" & Event_Type == "State point")
 
-med_times <- df_points %>% 
-  group_by(Behavior) %>% 
-  summarise(med_time = median(start_fraction)) %>%
-  arrange(med_time) %>% 
-  pull(Behavior)
-
-
-
 df_points %>%
   group_by(Behavior, dyad_set) %>%
-  summarise(q1 = quantile(start_fraction, 0.25), median = median(start_fraction), q3 = quantile(start_fraction, 0.75), n = n()) %>%
-  right_join(expand_grid(
-    Behavior =df_points$Behavior %>% unique(),
-    dyad_set = dyad_set_levels
-  )) %>%
-  kable(digits=2)
+  summarise(q1 = quantile(start_fraction, 0.25),
+            median = median(start_fraction),
+            q3 = quantile(start_fraction, 0.75), 
+            total_expressions = n(), 
+            n_dyads = n_distinct(dyad_set, id)) %>%
+  kable(digits=2, caption = "When behaviors happen within the feeding, proportionally")
 ```
 
