@@ -10,6 +10,8 @@ output:
 
 # Time-based analsis of mothers' behaviors
 
+## Useful in assessing to what degree some behaviors may be associated with the time in feeding.
+
 ```{r setup, include=FALSE}
 source("shared_setup.R")
 ```
@@ -157,77 +159,5 @@ df_points %>%
     dyad_set = dyad_set_levels
   )) %>%
   kable(digits=2)
-```
-
-
-```{r}
-mother_narrow <- data_dyad_total_zeros %>% 
-  filter(dyad_unit == "Mom") %>% 
-  distinct(Narrow_group) %>% 
-  pull()
-
-for(behavior_type in mother_narrow){
-  p <- data_dyad_total_zeros %>%
-    filter(dyad_unit == "Mom") %>% 
-    filter(Narrow_group==behavior_type) %>% 
-    mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-    #filter(num_per_min < 2) %>% 
-    ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
-    geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-    ggtitle(paste(behavior_type, "behavior frequency distributions by age")) + 
-    xlab("Behaviors per minute")
-  print(p)
-}
-```
-
-```{r}
-data_dyad_total_zeros %>%
-  filter(dyad_unit == "Mom") %>% 
-  filter(!(Behavior %in% bottle_states)) %>% 
-  group_by(dyad_set, id, Narrow_group) %>% 
-  summarise(sum_num_per_min = sum(num_per_min)) %>% 
-  mutate(Narrow_group = reorder(Narrow_group, sum_num_per_min, median)) %>% 
-  #filter(num_per_min < 2) %>% 
-  ggplot(aes(y=Narrow_group, x=sum_num_per_min, col=dyad_set)) +
-  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-  ggtitle("Mothers' behavior frequency distributions by behavior group") + 
-  xlab("Behaviors per minute")
-```
-
-```{r}
-states <- data_duration %>%
-  filter(dyad_unit == "Mom") %>% 
-  filter(!(Behavior %in% bottle_states)) %>% 
-  filter(Narrow_group!="Baseline") %>%
-  filter(Event_Type == "State start") %>% 
-  distinct(Behavior) %>% 
-  pull()
-
-
-total_fractions <- data_duration %>%
-  filter(Behavior %in% states) %>% 
-  filter(Event_Type == "State start") %>%
-  group_by(id, dyad_set, Behavior) %>% 
-  summarise(total_fraction = sum(duration_fraction))
-
-total_fractions <- total_fractions %>% 
-  expand(nesting(id, dyad_set), Behavior = states) %>%
-  left_join(total_fractions, on=c(id, dyad_set, Behavior)) %>%
-  replace_na(list(total_fraction = 0)) %>% 
-  group_by(Behavior, dyad_set) %>% 
-  summarise(mean_fraction = mean(total_fraction))
-
-  
-#total_fractions %>% group_by(dyad_set) %>% summarise(s = sum(mean_fraction))
-
-p <- total_fractions %>% 
-  ggplot(aes(x=dyad_set, y=mean_fraction, group=Behavior, color=Behavior)) +
-  geom_path() + 
-  geom_point() +
-  ylab("Mean Fraction of Time in State") +
-  xlab("Dyad Set") +
-  ggtitle("Proportion of time exhibiting certain behaviors")
-
-p %>% ggplotly()
 ```
 
