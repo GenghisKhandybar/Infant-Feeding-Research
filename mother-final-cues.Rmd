@@ -86,20 +86,33 @@ verbose_props %>%
   kable(caption="Proportion of mothers displaying each behavior in the last 25% of feeding")
 
 # Plot ----------
+mom_groups <- behavior_codebook %>%
+  filter(dyad_unit=="Mom") %>% 
+  filter(Event_Type == "State point") %>% 
+  distinct(Wide_group) %>% 
+  pull()
 
-p <- last_cue_counts %>% 
-  ggplot(aes(color=Behavior, 
-             group=Behavior,
-             y=pct_dyads, 
-             x = dyad_set)) +
-  geom_point() +
-  geom_line() +
-  ylab("Percent expressing behavior") +
-  xlab("Dyad set") +
-  ggtitle("Mothers displaying behaviors at least once in the final 25% of feeding")
+for(group in mom_groups){
+  behaviors <- behavior_codebook %>% filter(Wide_group == group) %>% pull(Behavior)
 
-p %>% 
-  ggplotly()
+  p <- last_cue_counts %>% 
+    filter(Behavior %in% behaviors) %>% 
+    ggplot(aes(color=Behavior, 
+               group=Behavior,
+               y=pct_dyads, 
+               x = dyad_set)) +
+    geom_point() +
+    geom_line() +
+    ylim(0,100) +
+    ylab("Percent expressing behavior") +
+    xlab("Dyad set") +
+    ggtitle(paste("Mothers displaying", group, "behaviors at least once in the final 25% of feeding"))
+  
+  p %>% 
+    ggplotly() %>% 
+    print()
+}
+
 ```
 
 ```{r distribution_plot}
@@ -211,6 +224,7 @@ total_fractions <- total_fractions %>%
 p <- total_fractions %>% 
   ggplot(aes(x=dyad_set, y=mean_fraction, group=Behavior, color=Behavior)) +
   geom_path() + 
+  geom_point() +
   ylab("Mean Fraction of Time in State") +
   xlab("Dyad Set") +
   ggtitle("Proportion of time exhibiting certain behaviors")
