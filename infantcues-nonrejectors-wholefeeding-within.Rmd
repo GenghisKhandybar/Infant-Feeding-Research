@@ -9,6 +9,7 @@ FIX TO DO TOTAL NUMBER OF CUES BOTH WITH AND WITHOUT CRYING/EYES-CLOSED
 
 
 ```{r setup, include=FALSE}
+include_rejectors <- c(0)
 source("shared_setup.R")
 ```
 
