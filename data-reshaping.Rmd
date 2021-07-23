@@ -265,8 +265,9 @@ data_dyad_total <- data_duration %>%
             total_duration = sum(duration),
             num_occurrences = n(),
             video_length = max(video_length)) %>%
-  mutate(num_per_length = num_occurrences / video_length,
-         num_per_min = 60*num_occurrences / video_length)
+  mutate(video_mins = video_length / 60,
+         num_per_length = num_occurrences / video_length,
+         num_per_min = num_occurrences / video_mins)
 
 
 ```
