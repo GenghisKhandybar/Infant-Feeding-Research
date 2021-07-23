@@ -12,8 +12,6 @@ This analysis excludes bottle rejectors.
 
 # Time-based analsis of mothers' behaviors
 
-## Useful in assessing to what degree some behaviors may be associated with the time in feeding.
-
 ```{r setup, include=FALSE}
 include_rejectors <- c(0)
 source("shared_setup.R")
@@ -58,30 +56,48 @@ last_cue_counts %>%
 Predictably, the large majority of sessions end with an indication that the session is over.
 
 ```{r last_quarter}
-after_prop = 0.75
+num_splits = 4
 
 near_final_cues =  data_duration %>% 
   filter(dyad_unit == "Mom") %>% 
   filter(Event_Type == "State point") %>% 
-  filter(start_fraction > after_prop) %>% 
+  mutate(split = get_time_split(start_fraction, num_splits)) %>% 
+  filter(split == num_splits) %>% 
+  #filter(start_fraction > after_prop) %>% 
   distinct(Behavior, dyad_set, id) #Removes repeated cues from the same infant within the same feeding
 
 last_cue_counts <- near_final_cues %>% 
   group_by(dyad_set) %>% 
   count(Behavior)
   
+
 #Creating proportion variable
-last_cue_counts <- last_cue_counts %>% 
+combinations <- expand_grid(Behavior = near_final_cues %>% distinct(Behavior) %>% pull(), 
+            dyad_set = last_cue_counts %>% distinct(dyad_set) %>% pull())
+
+
+
+last_cue_counts <- combinations %>% 
+  left_join(last_cue_counts) %>% 
+  mutate(n = replace_na(n, 0)) %>% 
   left_join(n_dyads,
             on=dyad_set) %>% 
-  mutate(pct_dyads = 100*n/n_dyads,
-         Behavior = reorder(Behavior, desc(pct_dyads)))
+  mutate(prop_dyads = n/n_dyads,
+         Behavior = reorder(Behavior, desc(prop_dyads))) %>% 
+  mutate(pct_dyads = prop_dyads*100)
+
+# #Creating proportion variable
+# last_cue_counts <- last_cue_counts %>% 
+#   left_join(n_dyads,
+#             on=dyad_set) %>% 
+#   mutate(pct_dyads = 100*n/n_dyads,
+#          Behavior = reorder(Behavior, desc(pct_dyads)))
 
 # Table -----------
 
 verbose_props <- last_cue_counts %>% 
   mutate(prop_dyads_verbose = paste(
-    round(pct_dyads, 2) %>% str_pad(width=4, side="right", pad="0"),
+    round(prop_dyads, 2) ,#%>% str_pad(width=4, side="right", pad="0"),
     " (", n, "/", n_dyads, ")", sep = "")) %>% 
   pivot_wider(names_from = dyad_set, 
               values_from = prop_dyads_verbose, 
@@ -152,7 +168,7 @@ df_points %>%
             median = median(start_fraction),
             q3 = quantile(start_fraction, 0.75), 
             total_expressions = n(), 
-            n_dyads = n_distinct(dyad_set, id)) %>%
+            dyads_expressing = n_distinct(dyad_set, id)) %>%
   kable(digits=2, caption = "When behaviors happen within the feeding, proportionally")
 ```
 

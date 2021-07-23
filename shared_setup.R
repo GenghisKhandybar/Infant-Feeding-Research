@@ -70,8 +70,6 @@ data <- read_csv("data.csv") %>%
 
 # Reading data_dyad_total_zeros ----------------------------------------------------
 
-
-
 data_dyad_total_zeros <- read_csv("data-dyad-total-zeros.csv") %>%
   mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels),
          id = factor(id),
@@ -142,8 +140,20 @@ state_point_duration <- 0.00001 # for easier coding, treat state points as start
 
 behavior_codebook <- read_csv("behavior_codebook.csv")
 
+# get_time_split arbitrary quantile function --------------------------------------
+
+
+get_time_split <- function(x, q) {
+  # x is a number in [0, 1]
+  # q is number of time splits, e.g., 4 for quarters, 2 for halves, etc
+  ifelse(x == 1, q, 1 + trunc((x * q) %% q))
+}
+
+
 # Auto-labeling ----------------------------------------------------
 #Code adapted and improved from: https://www.pogol.net/using-attr-labels-for-ggplot
+# Though interesting, it ended up not being worth the effort because we very rarely use an unmodified dataset to create plots.
+
 
 
 # ggplot=function(...){
