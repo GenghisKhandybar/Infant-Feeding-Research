@@ -8,7 +8,10 @@ output:
     highlight: github
 ---
 
+This analysis excludes bottle rejectors.
+
 ```{r setup, include=FALSE}
+include_rejectors <- c(0)
 source("shared_setup.R")
 ```
 
@@ -20,26 +23,28 @@ video_lengths <- data_dyad_total_zeros %>%
   group_by(dyad_set, id) %>%
   filter(video_length == max(video_length)) %>%
   filter(row_number() == 1) %>%
-  select(id, dyad_set, video_length, Bottle_Rejector)
+  select(id, dyad_set, video_length, Bottle_Rejector) %>% 
+  mutate(video_mins = video_length/60)
 
 ggplot(video_lengths,
-       aes(x = video_length, color = dyad_set, fill = dyad_set)) +
+       aes(x = video_mins, color = dyad_set, fill = dyad_set)) +
   geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity")
   
 ggplot(video_lengths,
-       aes(x = dyad_set, y = video_length, col = dyad_set)) +
+       aes(x = dyad_set, y = video_mins, col = dyad_set)) +
   coord_flip() +
   geom_violin() + 
   geom_boxplot(width = 0.1) + 
   geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
-  scale_shape_manual(values = c(1, 4))
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Video length (minutes)")
 ```
 
 ```{r}
 
 video_lengths %>%
   group_by(dyad_set) %>%
-  summarize_at(vars(video_length),
+  summarize_at(vars(video_mins),
                list(size = ~length(.),
                     ~mean(.),
                     ~sd(.),
@@ -47,7 +52,7 @@ video_lengths %>%
                     Q1 = ~quantile(., 0.25),
                     ~median(.), Q3 = ~quantile(., 0.75),
                     ~max(.))) %>%
-  kable(digits = 1)
+  kable(digits = 1, caption = "Distributions of video lengths (in minutes)")
 
 ```
 
@@ -66,9 +71,9 @@ data_dyad_total_cues <- data_dyad_total_zeros %>%
   summarize(Bottle_Rejector = first(Bottle_Rejector),
             num_cues = sum(num_occurrences),
             num_types = n_distinct(Behavior[num_occurrences > 0]),
-            num_cues_per_length = sum(num_per_length),
-            video_length = max(video_length)) %>%
-  mutate(num_types_per_length = num_types / video_length)
+            num_cues_per_min = 60 * sum(num_per_length),
+            video_mins = max(video_length) / 60) %>%
+  mutate(num_types_per_min = num_types / video_mins)
 
 ```
 
@@ -91,7 +96,7 @@ ggplot(data_dyad_total_cues,
 
 
 
-```{r}
+```{r total_cues_table}
 
 data_dyad_total_cues %>% 
   group_by(dyad_set) %>%
@@ -103,7 +108,8 @@ data_dyad_total_cues %>%
                     Q1 = ~quantile(., 0.25),
                     ~median(.), Q3 = ~quantile(., 0.75),
                     ~max(.))) %>%
-  kable(digits = 1)
+  kable(digits = 1, 
+        caption = "Distributions of total cue numbers by age")
 
 ```
 
@@ -112,18 +118,19 @@ data_dyad_total_cues %>%
 
 ```{r}
 ggplot(data_dyad_total_cues,
-       aes(x = num_cues_per_length, color = dyad_set, fill = dyad_set)) +
+       aes(x = num_cues_per_min, color = dyad_set, fill = dyad_set)) +
   geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
-  ylab("Total number of infants cues divided by length of feeding")
+  ylab("Total number of infants cues divided by minutes of feeding") +
+  xlab("Cues per minute")
   
 ggplot(data_dyad_total_cues,
-       aes(x = dyad_set, y = num_cues_per_length, col = dyad_set)) +
+       aes(x = dyad_set, y = num_cues_per_min, col = dyad_set)) +
   coord_flip() +
   geom_violin() + 
   geom_boxplot(width = 0.1) + 
   geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
   scale_shape_manual(values = c(1, 4)) +
-  ylab("Total number of infants cues divided by length of feeding")
+  ylab("Total number of infants cues per minute of feeding")
                  
 ```
 
@@ -132,7 +139,7 @@ ggplot(data_dyad_total_cues,
 
 data_dyad_total_cues %>% 
   group_by(dyad_set) %>%
-  summarize_at(vars(num_cues_per_length),
+  summarize_at(vars(num_cues_per_min),
                list(size = ~length(.),
                     ~mean(.),
                     ~sd(.),
@@ -140,7 +147,8 @@ data_dyad_total_cues %>%
                     Q1 = ~quantile(., 0.25),
                     ~median(.), Q3 = ~quantile(., 0.75),
                     ~max(.))) %>%
-  kable(digits = 4)
+  kable(digits = 2,
+        caption = "Cues per minute by age")
 
 ```
 
@@ -158,8 +166,8 @@ data_dyad_total_cues_point <- data_dyad_total_zeros %>%
   summarize(Bottle_Rejector = first(Bottle_Rejector),
             num_cues = sum(num_occurrences),
             num_types = n_distinct(Behavior[num_occurrences > 0]),
-            num_cues_per_length = sum(num_per_length),
-            video_length = max(video_length))
+            num_cues_per_min = 60*sum(num_per_length),
+            video_mins = max(video_length) / 60)
 
 ggplot(data_dyad_total_cues_point,
        aes(x = num_cues, color = dyad_set, fill = dyad_set)) +
@@ -189,7 +197,8 @@ data_dyad_total_cues_point %>%
                     Q1 = ~quantile(., 0.25),
                     ~median(.), Q3 = ~quantile(., 0.75),
                     ~max(.))) %>%
-  kable(digits = 1)
+  kable(digits = 1,
+        caption = "Numbers of point cues by age")
 
 ```
 
@@ -198,19 +207,19 @@ data_dyad_total_cues_point %>%
 
 ```{r}
 ggplot(data_dyad_total_cues_point,
-       aes(x = num_cues_per_length, color = dyad_set, fill = dyad_set)) +
+       aes(x = num_cues_per_min, color = dyad_set, fill = dyad_set)) +
   geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
-  ylab("Total number of infants cues divided by length of feeding") +
+  ylab("Total number of infants cues divided by length of feeding (minutes)") +
   ggtitle("Excluding state cues (Crying and Eyes Closed)")
   
 ggplot(data_dyad_total_cues_point,
-       aes(x = dyad_set, y = num_cues_per_length, col = dyad_set)) +
+       aes(x = dyad_set, y = num_cues_per_min, col = dyad_set)) +
   coord_flip() +
   geom_violin() + 
   geom_boxplot(width = 0.1) + 
   geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
   scale_shape_manual(values = c(1, 4)) +
-  ylab("Total number of infants cues divided by length of feeding") +
+  ylab("Total number of infants cues divided by length of feeding (minutes)") +
   ggtitle("Excluding state cues (Crying and Eyes Closed)")
                  
 ```
@@ -218,10 +227,9 @@ ggplot(data_dyad_total_cues_point,
 
 
 ```{r}
-
 data_dyad_total_cues_point %>% 
   group_by(dyad_set) %>%
-  summarize_at(vars(num_cues_per_length),
+  summarize_at(vars(num_cues_per_min),
                list(size = ~length(.),
                     ~mean(.),
                     ~sd(.),
@@ -229,8 +237,8 @@ data_dyad_total_cues_point %>%
                     Q1 = ~quantile(., 0.25),
                     ~median(.), Q3 = ~quantile(., 0.75),
                     ~max(.))) %>%
-  kable(digits = 4)
-
+  kable(digits = 2,
+        caption = "Point cues per minute by age")
 ```
 
 
@@ -248,7 +256,9 @@ ggplot(data_dyad_total_cues,
   xlab("Number of different types of cues")
 
 ggplot(data_dyad_total_cues,
-       aes(x = dyad_set, y = num_types, col = dyad_set)) +
+       aes(x = dyad_set, 
+           y = num_types, 
+           col = dyad_set)) +
   coord_flip() +
   geom_boxplot(width = 0.1) + 
   geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
@@ -276,12 +286,12 @@ data_dyad_total_cues %>%
 
 ```{r}
 ggplot(data_dyad_total_cues,
-       aes(x = num_types_per_length, color = dyad_set, fill = dyad_set)) +
+       aes(x = num_types_per_min, color = dyad_set, fill = dyad_set)) +
   geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
   xlab("Number of different types divided by length of feeding")
   
 ggplot(data_dyad_total_cues,
-       aes(x = dyad_set, y = num_types_per_length, col = dyad_set)) +
+       aes(x = dyad_set, y = num_types_per_min, col = dyad_set)) +
   coord_flip() +
   geom_violin() + 
   geom_boxplot(width = 0.1) + 
@@ -297,7 +307,7 @@ ggplot(data_dyad_total_cues,
 
 data_dyad_total_cues %>% 
   group_by(dyad_set) %>%
-  summarize_at(vars(num_types_per_length),
+  summarize_at(vars(num_types_per_min),
                list(size = ~length(.),
                     ~mean(.),
                     ~sd(.),
