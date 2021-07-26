@@ -121,6 +121,12 @@ mom_behaviors <- data_duration %>%
 
 bottle_states <- state_behaviors[grep("Bottle", state_behaviors)]
 
+# Dyad set counts (depending on whether bottle rejectors are included) -------------------------------
+
+dyad_set_counts <- data_duration %>% 
+  distinct(dyad_set, id) %>% 
+  group_by(dyad_set) %>% 
+  summarise(count = n())
 
 # Setting ggplot automation --------------------------------------------------------
 
