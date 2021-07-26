@@ -121,44 +121,6 @@ final_cue %>%
 
 This table reflects the previous chart, aggregated over the 4 dyad age groups. The precise mean and median values may have been hard to discern from the plot, so they're shown in the table here.
 
-<!-- ## Frequency of cues within the final 60 seconds -->
-
-<!-- ```{r last_60_sec}  -->
-<!-- #Not included b/c 25% appears better -->
-<!-- proximity_period = 60 -->
-
-<!-- near_final_cues =  data_duration %>%  -->
-<!--   filter(dyad_unit == "Baby") %>%  -->
-<!--   filter(Grouped_behavior == "Infant Satiation Cues") %>%   -->
-<!--   filter(video_length - Time_Relative_sf < proximity_period) %>%  -->
-<!--   distinct(Behavior, dyad_set, id) #Removes repeated cues from the same infant within the same feeding -->
-
-<!-- # Below is copied from final_cues code block -->
-
-<!-- last_cue_counts <- near_final_cues %>%  -->
-<!--   group_by(dyad_set) %>%  -->
-<!--   count(Behavior) -->
-
-<!-- #Creating proportion variable -->
-<!-- last_cue_counts <- last_cue_counts %>%  -->
-<!--   left_join(n_dyads, -->
-<!--             on=dyad_set) %>%  -->
-<!--   mutate(prop_dyads = n/n_dyads) -->
-
-<!-- last_cue_counts %>%  -->
-<!--   ggplot(aes(color=Behavior,  -->
-<!--              group=Behavior, -->
-<!--              y=prop_dyads*100,  -->
-<!--              x = dyad_set)) + -->
-<!--   geom_point() + -->
-<!--   geom_line() + -->
-<!--   ylab("Percent expressing cue") + -->
-<!--   xlab("Dyad set") + -->
-<!--   ggtitle("Infants displaying cues at least once in the final 60 seconds of feeding") -->
-<!-- ``` -->
-
-<!-- Common cues in the last 60 seconds include shaking head, drooling, and pushing bottle away. These may indicate satiation. -->
-
 ## Frequency of cues within the last 25% of feeding
 
 ```{r last_quarter}
