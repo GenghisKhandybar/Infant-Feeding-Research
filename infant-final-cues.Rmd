@@ -243,11 +243,52 @@ last_cue_counts %>%
   ggtitle("Relative cue pervailence in the final 25% of feeding",
           subtitle= "Probability of cue in last 25% divided by average probability\nin the first 75% of feeding") +
   theme(legend.position = "none") #The fill colors are purely aesthetic so the legend is removed.
+
 ```
 
 How many times more likely are infants to express each cue at least once in the last quarter than in the previous 3 quarters? It turns out that lip compression is highly associated with the last quarter of feeding, being over 1.5-2.5 times as likely to happen at least once in the final quarter than in the other quarters, depending on the infant's age. This plot is important because the previous plot may have suggested that "Shakes head or turns head/body away" would serve as a good indicator of being in the last quarter for 4-6 month infants, the cue is just a common action even in other quarters. The relative frequency of that cue is actually higher in 2 week and 2 month old infants than their older counterparts.
 
+```{r}
+# Many line plots -----------
 
+
+
+grid_plot <- function(group, num_splits){
+  #Similar to before, but not only the first 3 quarters
+  n_dyads_cue <- data_duration %>% #Cue representation in dyads before the requested time period
+    filter(dyad_unit == "Baby") %>% 
+    filter(Grouped_behavior == "Infant Satiation Cues") %>%  
+    mutate(split = get_time_split(start_fraction, num_splits)) %>% 
+    distinct(Behavior, dyad_set, id, split) %>% #Removes repeated cues from the same infant within the same feeding
+    group_by(dyad_set, split) %>% 
+    count(Behavior) %>% 
+    mutate(n_dyads = n) %>% 
+    select(!n) %>% 
+    left_join(dyad_set_counts) %>% 
+    mutate(prop_dyads = n_dyads / count)
+  
+  used_behaviors <- behavior_codebook %>% 
+            filter(Narrow_group == group) %>% 
+            pull(Behavior)
+  
+  n_dyads_cue %>% 
+    filter(Behavior %in% used_behaviors) %>% 
+    ggplot(aes(y=prop_dyads, x = split)) +
+    geom_bar(position="dodge", stat="identity") +
+    facet_grid(reorder(Behavior, desc(prop_dyads))~dyad_set) +
+    ggtitle(paste("Percent of infants expressing ", group, " behaviors in each 1/", num_splits, " of feeding", sep = ""))+
+    xlab("Split") +
+    theme(strip.text.y.right = element_text(angle = 0)) +
+    ylim(0, 0.6) %>% 
+    return()
+}
+grid_plot("Potent", 4)
+grid_plot("Subtle", 4)
+grid_plot("Potent", 5)
+grid_plot("Subtle", 5)
+```
+
+These plots provide a more intutive comparison between behaviors in different quarters, fifths, or any other split desired. The same trends are visible in the previous "Relative cue pervailence in the final 25% of feeding" plot, but with even more detail. (Split by behavior type is just to keep the plots a readable size.)
 
 ## Comparing when different cues tend to be expressed by infants
 
