@@ -185,38 +185,23 @@ line_plot("Subtle")
 
 data_dyad_total_zeros %>%
   filter(dyad_unit == "Baby") %>% 
-  filter(Narrow_group=="Potent") %>% 
+  filter(Narrow_group=="Potent") %>%
+  filter(num_per_min>0) %>% 
   mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-  #filter(num_per_min < 2) %>% 
-  ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
+  ggplot(aes(y=Behavior, x=log(num_per_min), col=dyad_set)) +
   geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-  ggtitle("Potent behhavior frequency distributions by age",
-          subtitle = "Outliers above 2 shown below") + 
-  xlab("Cues per minute")# +
-  #xlim(0,outliers_over)
+  ggtitle("Potent behhavior frequency distributions by age") + 
+  xlab("Cues per minute (log base 2 scale)")# +
 
 data_dyad_total_zeros %>%
   filter(dyad_unit == "Baby") %>% 
   filter(Narrow_group=="Subtle") %>% 
+  filter(num_per_min>0) %>% 
   mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-  #filter(num_per_min < 2) %>% 
-  ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
+  ggplot(aes(y=Behavior, x=log2(num_per_min), col=dyad_set)) +
   geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-  ggtitle("Subtle behhavior frequency distributions by age",
-          subtitle = "Outliers above 2 shown below") + 
-  xlab("Cues per minute")# +
-  #xlim(0,outliers_over)
-
-# data_dyad_total_zeros %>%
-#   filter(dyad_unit == "Baby") %>% 
-#   filter(Narrow_group!="Baseline") %>% 
-#   mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-#   filter(num_per_min > 2) %>% 
-#   ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set, group=dyad_set)) +
-# 
-#   geom_point(alpha = 0.75, size=2, position=position_dodge(width=0.75))+
-#   ggtitle("Outliers from previous 2 charts (above 2)") +
-#   xlim(2, NA)
+  ggtitle("Subtle behhavior frequency distributions by age") + 
+  xlab("Cues per minute (log base 2 scale)")
 ```
 
 
