@@ -78,8 +78,12 @@ time_plot <- function(states){
     ggtitle("Proportion of time exhibiting certain behaviors") %>% 
     return()
 }
-
+data_duration %>% 
+  filter(dyad_unit == "Baby") %>% 
+  filter(Event_Type == "State start") %>% 
+  distinct(Behavior)
 related <- list(
+  c("Bottle in mouth", "Bottle offered", "Crying", "Eyes Closed"),
   c("Bottle not in mouth", "Bottle in mouth", "Bottle offered"),
   c("Crying", "Not Crying"),
   c("Eyes Closed", "Eyes Open"))
