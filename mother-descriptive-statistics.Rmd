@@ -150,6 +150,8 @@ One unusual finding here is that among four behaviors (3 controlling, one respon
 
 ## Behavior frequencies
 
+The following plots illustrate differences in behaviors per minute.
+
 ```{r}
 mother_narrow <- data_dyad_total_zeros %>% 
   filter(dyad_unit == "Mom") %>% 
@@ -164,7 +166,8 @@ for(behavior_type in mother_narrow){
     filter(num_per_min > 0) %>% 
     ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
     geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-    ggtitle(paste(behavior_type, "behavior frequencies by age (0's excluded)")) + 
+    xlim(0,8) +
+    ggtitle(paste(behavior_type)) + 
     xlab("Behaviors per minute")
   print(p)
 }
