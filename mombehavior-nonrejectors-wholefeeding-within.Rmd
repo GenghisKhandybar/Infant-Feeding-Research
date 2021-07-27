@@ -5,11 +5,12 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-source("shared_setup.R")
-library(plotly)
-```
+This analysis excludes bottle rejectors.
 
+```{r setup, include=FALSE}
+include_rejectors <- c(0)
+source("shared_setup.R")
+```
 
 # Number of bottle-in-mouth bouts
 
@@ -17,7 +18,6 @@ library(plotly)
 
 data_dyad_total_bottle_state <- data_dyad_total_zeros %>%
   filter(Behavior == "Bottle in mouth")
-
 
 ```
 

@@ -155,6 +155,9 @@ get_time_split <- function(x, q) {
   ifelse(x == 1, q, 1 + trunc((x * q) %% q))
 }
 
+# Ratio lines (used in descriptive-statistics-infant-cues)
+
+ratio_lines = seq(1, 4, 0.5)
 
 # Auto-labeling ----------------------------------------------------
 #Code adapted and improved from: https://www.pogol.net/using-attr-labels-for-ggplot
