@@ -314,26 +314,72 @@ df_points %>%
 
 Like the previous plot, this one finds the strongest indicator of satiation to be lip compression. This may be the best expression of where within the feeding session infants tend to express each cue, and allows us to see that many cues at different ages are expressed almost uniformly regardless of feeding progress. Those cues may still be important, but cannot be used on their own as indicators that an infant is satiated. Pushing nipple out with tongue or biting it appear to be more common at the start of feeding.
 
-# Cues over the whole duration
-
-This analysis has been moved to infant_descriptive_statistics.
-
 ## Work in progress
 
 ## Final cues within babies
 
 ```{r}
-near_final_cues %>% 
-  mutate(id = factor(id)) %>% 
+obs = 4 #Dyads observed at 4 ages only
+
+final_cue <- data_duration %>% 
+  filter(dyad_unit == "Baby") %>% 
+  filter(Grouped_behavior == "Infant Satiation Cues") %>% 
+  group_by(id, dyad_set) %>% 
+  slice_max(order_by=Time_Relative_sf, n=1) %>% 
+  ungroup()
+
+ages_counts <- final_cue %>%
+  distinct(id, dyad_set) %>% 
+  group_by(id) %>%
+  mutate(num_ages = n()) %>% 
+  ungroup() %>% 
+  select(id, num_ages) %>% 
+  distinct(id, .keep_all = TRUE)
+
+n_at_4 <- final_cue %>% 
+  left_join(ages_counts, on=id) %>% 
+  filter(num_ages == obs) %>% 
+  group_by(Behavior) %>% 
+  summarise(n = n()) %>% 
+  pull(n) %>% sum()
+
+final_cue_count_props <- final_cue %>% 
+  left_join(ages_counts, on=id) %>% 
+  filter(num_ages == obs) %>% 
   group_by(id) %>% 
   count(Behavior) %>% 
-  ggplot(aes(x=n)) +
-  geom_bar() +
-  facet_grid(cols=vars(Behavior)) +
-  theme(strip.text.x = element_text(angle=90)) +
-  ggtitle("Individual infants' counts of final cues") +
-  xlab("Number of feedings ending in cue") +
-  ylab("Count of infants") 
+  group_by(Behavior, n) %>% 
+  summarise(prop = n()/n_at_4, n_obs = n()) %>%
+  arrange(-n) %>% #Find cumulative proportions
+  group_by(Behavior) %>% 
+  mutate(cum_prop = cumsum(prop), cum_n_obs = cumsum(n_obs))
+
+final_cue_count_props %>% 
+  pivot_wider(id_cols = "Behavior", names_from = n, values_from = c("prop", "cum_prop", "n_obs")) %>% 
+  mutate(across(everything(), .fns = ~replace_na(.,0))) %>% 
+  mutate(Overall.proportion = prop_1 + prop_2 * 2 + prop_3 * 3) %>% 
+  arrange(-Overall.proportion) %>% 
+  kable(digits=2, caption = "Dyads observed at 4 ages: repeated final cues. Proportion of infants repeating a cue n times. (total 137 observations)")
+
+# final_cue_count_props %>% 
+#   ggplot(aes(x=n, y=prop)) +
+#   geom_bar(stat = "identity") +
+#   facet_grid(cols=vars(Behavior)) +
+#   theme(strip.text.x = element_text(angle=90)) +
+#   ggtitle("Individual infants' proportions of final cues (observed at 4 ages)") +
+#   xlab("Number of feedings ending in cue") +
+#   ylab("Proportion of babies")
+# 
+# final_cue_count_props %>% 
+#   ggplot(aes(x=n, y=cum_prop)) +
+#   geom_bar(stat = "identity") +
+#   facet_grid(cols=vars(Behavior)) +
+#   theme(strip.text.x = element_text(angle=90)) +
+#   ggtitle("Individual infants' cumulative proportions of final cues (observed at 4 ages)") +
+#   xlab("Number of feedings ending in cue") +
+#   ylab("Proportion ending in cue n or more times") 
 ```
 
+This reveals little within-baby correlation, such as that 20% of infants end by drooling/spitting up, but of the 23 infants ending on the cue at least once, only 5 ended on it a second time. This is only 22% of those who express the cue at least once expressing it again, so not much higher than would be expected under the null hypothesis that all infants express final cues with the same frequencies.
 
+This may serve as abase for within-dyad comparisons, though when so sub-divided, a good statistical analysis may be hard at the small sample sizes.
