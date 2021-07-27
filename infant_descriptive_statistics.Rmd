@@ -17,40 +17,7 @@ source("shared_setup.R")
 
 # Cues over the whole duration
 
-<!-- ## Proportion of dyads that express the cue at least once during feeding, by age -->
-
-<!-- ```{r} -->
-<!-- n_dyads <- data_duration %>%  -->
-<!--   distinct(id, dyad_set) %>%  -->
-<!--   count(dyad_set) %>%  -->
-<!--   rename(n_dyads = n) -->
-<!--   #mutate(n_dyads = n) %>%  -->
-<!--   #select(!n) -->
-
-<!-- behavior_props <- data_duration %>% -->
-<!--   filter(Event_Type == "State point") %>% -->
-<!--   filter(dyad_unit == "Baby") %>%  -->
-<!--   distinct(Behavior, id, dyad_set) %>%  -->
-<!--   group_by(dyad_set) %>%  -->
-<!--   count(Behavior) %>%  -->
-<!--   left_join(n_dyads, on=dyad_set) %>%  -->
-<!--   mutate(prop_shown = n/n_dyads) -->
-
-
-<!-- behavior_props %>%  -->
-<!--   ggplot(aes(y=Behavior, x=prop_shown, fill=dyad_set)) + -->
-<!--   geom_bar(stat="identity") + -->
-<!--   facet_grid(cols = vars(dyad_set)) + -->
-<!--   xlim(0, 1) +  -->
-<!--   theme(legend.position = "none")+ #The fill colors are purely aesthetic so the legend is removed. -->
-<!--   xlab("Proportion of infants that express the cue") + -->
-<!--   ylab("Infant cue") + -->
-<!--   ggtitle("Proportion of infants that express cue\n at least once during feeding") -->
-<!-- ``` -->
-
 ## Proportion of time in which behaviors are visible
-
-
 
 ```{r}
 time_plot <- function(states){
@@ -66,22 +33,21 @@ time_plot <- function(states){
     replace_na(list(total_fraction = 0)) %>% 
     group_by(Behavior, dyad_set) %>% 
     summarise(mean_fraction = mean(total_fraction))
-  
     
   #total_fractions %>% group_by(dyad_set) %>% summarise(s = sum(mean_fraction))
   
   total_fractions %>% 
-    ggplot(aes(x=dyad_set, y=mean_fraction, group=Behavior, color=Behavior)) +
+    ggplot(aes(x=dyad_set, y=mean_fraction, group=Behavior, color=Behavior,
+               linetype=Behavior)) +
     geom_path() + 
+    geom_point() +
     ylab("Mean Fraction of Time in State") +
     xlab("Dyad Set") +
+    ylim(0, 1) + 
     ggtitle("Proportion of time exhibiting certain behaviors") %>% 
     return()
 }
-data_duration %>% 
-  filter(dyad_unit == "Baby") %>% 
-  filter(Event_Type == "State start") %>% 
-  distinct(Behavior)
+
 related <- list(
   c("Bottle in mouth", "Bottle offered", "Crying", "Eyes Closed"),
   c("Bottle not in mouth", "Bottle in mouth", "Bottle offered"),
@@ -135,11 +101,12 @@ line_plot <- function(group){
     ggplot(aes(x=dyad_set, 
                y=prop_occurances, 
                color=Behavior,
-               group=Behavior)) +
+               group=Behavior,
+               linetype=Behavior)) +
     geom_point()+
     geom_line() +
     ylim(0, 1) +
-    ggtitle("Proportion of infants expressing cues") +
+    ggtitle(paste("Proportion of infants expressing", group, "cues")) +
     ylab("Proportion expressing cue at least once") +
     xlab("Baby age")
   
@@ -162,10 +129,11 @@ line_plot <- function(group){
     ggplot(aes(x=dyad_set, 
                y=mean_per_min, 
                color=Behavior,
-               group=Behavior)) +
+               group=Behavior,
+               linetype=Behavior)) +
     geom_point()+
     geom_line() +
-    ylim(0,0.6)+
+    ylim(0,1)+
     ggtitle(paste("Overall", group, "cue frequencies")) +
     ylab("Average expressions per minute") +
     xlab("Baby age")

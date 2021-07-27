@@ -73,16 +73,17 @@ total_fractions <- total_fractions %>%
   group_by(Behavior, dyad_set) %>% 
   summarise(mean_fraction = mean(total_fraction))
 
-  
-#total_fractions %>% group_by(dyad_set) %>% summarise(s = sum(mean_fraction))
-
 p <- total_fractions %>% 
-  ggplot(aes(x=dyad_set, y=mean_fraction, group=Behavior, color=Behavior)) +
+  ggplot(aes(x=dyad_set,
+             y=mean_fraction, 
+             group=Behavior, 
+             color=Behavior,
+             linetype=Behavior)) +
   geom_path() + 
   geom_point() +
   ylab("Mean Fraction of Time in State") +
   xlab("Dyad Set") +
-  ggtitle("Proportion of time exhibiting certain behaviors")
+  ggtitle("Proportion of time exhibiting extended behaviors")
 
 p %>% ggplotly()
 ```
@@ -99,7 +100,8 @@ line_plot <- function(group){
     ggplot(aes(x=dyad_set, 
                y=prop_occurances, 
                color=Behavior,
-               group=Behavior)) +
+               group=Behavior,
+               linetype=Behavior)) +
     geom_point()+
     geom_line() +
     ylim(0, 1) +
