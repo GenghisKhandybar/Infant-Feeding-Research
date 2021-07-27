@@ -12,43 +12,72 @@ include_rejectors <- c(0)
 source("shared_setup.R")
 ```
 
-```{r}
-mother_narrow <- data_dyad_total_zeros %>% 
-  filter(dyad_unit == "Mom") %>% 
-  distinct(Narrow_group) %>% 
-  pull()
+## Quarterly and per-quintile proportions
 
-for(behavior_type in mother_narrow){
-  p <- data_dyad_total_zeros %>%
-    filter(dyad_unit == "Mom") %>% 
-    filter(Narrow_group==behavior_type) %>% 
-    mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-    #filter(num_per_min < 2) %>% 
-    ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
-    geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-    ggtitle(paste(behavior_type, "behavior frequency distributions by age")) + 
-    xlab("Behaviors per minute")
-  print(p)
+```{r grid_plot}
+# Many bar plots -----------
+
+grid_plot <- function(group, num_splits){
+  used_behaviors <- behavior_codebook %>% 
+    filter(Wide_group == group) %>% 
+    pull(Behavior)
+  
+  
+  n_dyads_cue <- data_duration %>% #Cue representation in dyads before the requested time period
+    filter(Behavior %in% used_behaviors) %>% 
+    mutate(split = get_time_split(start_fraction, num_splits)) %>% 
+    distinct(Behavior, dyad_set, id, split) %>% #Removes repeated cues from the same infant within the same feeding
+    group_by(dyad_set, split) %>% 
+    count(Behavior) %>% 
+    mutate(n_dyads = n) %>% 
+    select(!n) %>% 
+    left_join(dyad_set_counts) %>% 
+    mutate(prop_dyads = n_dyads / count)
+  
+
+  n_dyads_cue %>% 
+    ggplot(aes(y=prop_dyads, x = split)) +
+    geom_bar(position="dodge", stat="identity") +
+    facet_grid(reorder(Behavior, desc(prop_dyads))~dyad_set) +
+    ggtitle(paste("Percent of infants expressing ", group, " behaviors in each 1/", num_splits, " of feeding", sep = ""))+
+    xlab("Split") +
+    ylab("Proportion expressing cue within period") +
+    theme(strip.text.y.right = element_text(angle = 0)) +
+    ylim(0, 1) %>% 
+    return()
 }
+
+grid_plot("Responsive", 4)
+grid_plot("Controlling", 4)
+grid_plot("Uninvolved", 4)
+grid_plot("Responsive", 5)
+grid_plot("Controlling", 5)
+grid_plot("Uninvolved", 5)
 ```
 
-In these plots, everything is treated as a state point behavior. Maybe it'd be more useful to separate the duration behaviors, but here we get a more direct comparison.
+```{r distribution_plot}
+df_points <- data_duration %>% 
+  filter(dyad_unit == "Mom" & Event_Type == "State point") %>% 
+  filter(Behavior != "Indicates feeding is over")
 
-```{r}
-data_dyad_total_zeros %>%
-  filter(dyad_unit == "Mom") %>% 
-  filter(!(Behavior %in% bottle_states)) %>% 
-  group_by(dyad_set, id, Narrow_group) %>% 
-  summarise(sum_num_per_min = sum(num_per_min)) %>% 
-  mutate(Narrow_group = reorder(Narrow_group, sum_num_per_min, median)) %>% 
-  #filter(num_per_min < 2) %>% 
-  ggplot(aes(y=Narrow_group, x=sum_num_per_min, col=dyad_set)) +
-  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-  ggtitle("Mothers' behavior frequency distributions by behavior group") + 
-  xlab("Behaviors per minute")
+med_times <- df_points %>% 
+  group_by(Behavior) %>% 
+  summarise(med_time = median(start_fraction)) %>%
+  arrange(med_time) %>% 
+  pull(Behavior)
+
+df_points %>% 
+  ggplot(aes(y=factor(Behavior, levels=med_times), x=start_fraction*100)) +
+  geom_violin(aes(fill=dyad_set))+
+  geom_boxplot(width=0.2, outlier.shape = NA, coef = 0) +
+  facet_grid(cols = vars(dyad_set)) +
+  ylab("Behavior") +
+  xlab("Percent of feeding completed") +
+  ggtitle("Shape and center 50 percentile of behavior times") +
+  theme(legend.position = "none") #The fill colors are purely aesthetic so the legend is removed.
 ```
 
-The main trends we can see are, encouragement is more often used on younger babies while responsive behavior is more often given to older infants.
+
 
 ```{r}
 states <- data_duration %>%
@@ -117,4 +146,63 @@ line_plot("Controlling")
 line_plot("Uninvolved")
 ```
 
-One unusual finding here is that among four behaviors(3 controlling, one responsive), there is a sharp decrease in frequency from 2 months to 4 months, then a rebound at 6 months. Any ideas why this might be?
+One unusual finding here is that among four behaviors (3 controlling, one responsive), there is a sharp decrease in frequency from 2 months to 4 months, then a rebound at 6 months. Any ideas why this might be?
+
+## Behavior frequencies
+
+```{r}
+mother_narrow <- data_dyad_total_zeros %>% 
+  filter(dyad_unit == "Mom") %>% 
+  distinct(Narrow_group) %>% 
+  pull()
+
+for(behavior_type in mother_narrow){
+  p <- data_dyad_total_zeros %>%
+    filter(dyad_unit == "Mom") %>% 
+    filter(Narrow_group==behavior_type) %>% 
+    mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
+    filter(num_per_min > 0) %>% 
+    ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
+    geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
+    ggtitle(paste(behavior_type, "behavior frequencies by age (0's excluded)")) + 
+    xlab("Behaviors per minute")
+  print(p)
+}
+```
+
+In these plots, everything is treated as a state point behavior. Maybe it'd be more useful to separate the duration behaviors, but here we get a more direct comparison.
+
+```{r}
+data_dyad_total_zeros %>%
+  filter(dyad_unit == "Mom") %>% 
+  filter(!(Behavior %in% bottle_states)) %>% 
+  filter(num_per_min > 0) %>% 
+  group_by(dyad_set, id, Narrow_group) %>% 
+  summarise(sum_num_per_min = sum(num_per_min)) %>% 
+  group_by(Narrow_group, dyad_set) %>% 
+  mutate(n = paste("n=", n())) %>% 
+  mutate(Narrow_group = reorder(Narrow_group, sum_num_per_min, median)) %>% 
+  ggplot(aes(y=Narrow_group, x=sum_num_per_min, col=dyad_set)) +
+  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
+  ggtitle("Mothers' behavior group frequencies (0's excluded)") + 
+  xlab("Behaviors per minute")
+```
+
+The main trends we can see are, encouragement is more often used on younger babies while responsive behavior is more often given to older infants.
+
+## Distribution table
+
+```{r distribution_table}
+#Table ---------------
+df_points <- data_duration %>% 
+  filter(dyad_unit == "Mom" & Event_Type == "State point")
+
+df_points %>%
+  group_by(Behavior, dyad_set) %>%
+  summarise(q1 = quantile(start_fraction, 0.25),
+            median = median(start_fraction),
+            q3 = quantile(start_fraction, 0.75), 
+            total_expressions = n(), 
+            dyads_expressing = n_distinct(dyad_set, id)) %>%
+  kable(digits=2, caption = "When behaviors happen within the feeding, proportionally")
+```

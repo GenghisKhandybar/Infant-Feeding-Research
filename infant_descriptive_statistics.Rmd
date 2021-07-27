@@ -17,6 +17,72 @@ source("shared_setup.R")
 
 # Cues over the whole duration
 
+```{r}
+# Many bar plots -----------
+
+grid_plot <- function(group, num_splits){
+  used_behaviors <- behavior_codebook %>% 
+    filter(Narrow_group == group) %>% 
+    pull(Behavior)
+  
+  
+  n_dyads_cue <- data_duration %>% #Cue representation in dyads before the requested time period
+    filter(Behavior %in% used_behaviors) %>% 
+    mutate(split = get_time_split(start_fraction, num_splits)) %>% 
+    distinct(Behavior, dyad_set, id, split) %>% #Removes repeated cues from the same infant within the same feeding
+    group_by(dyad_set, split) %>% 
+    count(Behavior) %>% 
+    mutate(n_dyads = n) %>% 
+    select(!n) %>% 
+    left_join(dyad_set_counts) %>% 
+    mutate(prop_dyads = n_dyads / count)
+  
+
+  n_dyads_cue %>% 
+    ggplot(aes(y=prop_dyads, x = split)) +
+    geom_bar(position="dodge", stat="identity") +
+    facet_grid(reorder(Behavior, desc(prop_dyads))~dyad_set) +
+    ggtitle(paste("Percent of infants expressing ", group, " behaviors in each 1/", num_splits, " of feeding", sep = ""))+
+    xlab("Split") +
+    ylab("Proportion expressing cue within period") +
+    theme(strip.text.y.right = element_text(angle = 0)) +
+    ylim(0, 0.6) %>% 
+    return()
+}
+
+grid_plot("Potent", 4)
+grid_plot("Subtle", 4)
+grid_plot("Potent", 5)
+grid_plot("Subtle", 5)
+```
+
+These plots provide a more intutive comparison between behaviors in different quarters, fifths, or any other split desired. The same trends are visible in the previous "Relative cue pervailence in the final 25% of feeding" plot, but with even more detail. (Split by behavior group is just to keep the plots a readable size.)
+
+## Comparing when different cues tend to be expressed by infants
+
+```{r}
+df_points <- data_duration %>% 
+  filter(dyad_unit == "Baby" & Event_Type == "State point")
+
+med_times <- df_points %>% 
+  group_by(Behavior) %>% 
+  summarise(med_time = median(start_fraction)) %>%
+  arrange(med_time) %>% 
+  pull(Behavior)
+
+df_points %>% 
+  ggplot(aes(y=factor(Behavior, levels=med_times), x=start_fraction*100)) +
+  geom_violin()+
+  geom_boxplot(width=0.2, outlier.shape = NA, coef = 0) +
+  facet_grid(cols = vars(dyad_set)) +
+  ylab("Behavior") +
+  xlab("Percent of feeding completed") +
+  ggtitle("Shape and center 50 percentile of cue Times")
+```
+
+Like the previous plot, this one finds the strongest indicator of satiation to be lip compression. This may be the best expression of where within the feeding session infants tend to express each cue, and allows us to see that many cues at different ages are expressed almost uniformly regardless of feeding progress. Those cues may still be important, but cannot be used on their own as indicators that an infant is satiated. Pushing nipple out with tongue or biting it appear to be more common at the start of feeding.
+
+
 ## Proportion of time in which behaviors are visible
 
 ```{r}
@@ -156,9 +222,31 @@ data_dyad_total_zeros %>%
   filter(Narrow_group=="Potent") %>%
   filter(num_per_min>0) %>% 
   mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-  ggplot(aes(y=Behavior, x=log(num_per_min), col=dyad_set)) +
+  ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
   geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-  ggtitle("Potent behhavior frequency distributions by age") + 
+  ggtitle("Potent behhavior frequencies (excluding 0's)") + 
+  xlab("Cues per minute (log base 2 scale)")# +
+
+data_dyad_total_zeros %>%
+  filter(dyad_unit == "Baby") %>% 
+  filter(Narrow_group=="Subtle") %>% 
+  filter(num_per_min>0) %>% 
+  mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
+  ggplot(aes(y=Behavior, x=(num_per_min), col=dyad_set)) +
+  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
+  ggtitle("Subtle behhavior frequencies (excluding 0's)") + 
+  xlab("Cues per minute (log base 2 scale)")
+
+# Log scale
+
+data_dyad_total_zeros %>%
+  filter(dyad_unit == "Baby") %>% 
+  filter(Narrow_group=="Potent") %>%
+  filter(num_per_min>0) %>% 
+  mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
+  ggplot(aes(y=Behavior, x=log2(num_per_min), col=dyad_set)) +
+  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
+  ggtitle("Potent behhavior frequencies (excluding 0's)") + 
   xlab("Cues per minute (log base 2 scale)")# +
 
 data_dyad_total_zeros %>%
@@ -168,7 +256,7 @@ data_dyad_total_zeros %>%
   mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
   ggplot(aes(y=Behavior, x=log2(num_per_min), col=dyad_set)) +
   geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-  ggtitle("Subtle behhavior frequency distributions by age") + 
+  ggtitle("Subtle behhavior frequencies (excluding 0's, log scale)") + 
   xlab("Cues per minute (log base 2 scale)")
 ```
 
