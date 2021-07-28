@@ -2,10 +2,11 @@
 title: 'Infant Cues - Across Ages - Whole Feeding - Non-Rejectors Only'
 author: ""
 date: "`r Sys.Date()`"
-output: 
-  prettydoc::html_pretty:
-    theme: cayman
-    highlight: github
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
 ---
 
 This analysis excludes bottle rejectors.

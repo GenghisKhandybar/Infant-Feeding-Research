@@ -2,10 +2,16 @@
 title: "mother-descriptive-statistics"
 author: "William Medwid"
 date: "7/22/2021"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
 ---
 
 This analysis excludes bottle rejectors.
+
+# Mother descriptive statistics
 
 ```{r setup, include=FALSE}
 include_rejectors <- c(0)
@@ -50,9 +56,9 @@ grid_plot <- function(group, num_splits){
 grid_plot("Responsive", 4)
 grid_plot("Controlling", 4)
 grid_plot("Uninvolved", 4)
-grid_plot("Responsive", 5)
-grid_plot("Controlling", 5)
-grid_plot("Uninvolved", 5)
+# grid_plot("Responsive", 5)
+# grid_plot("Controlling", 5)
+# grid_plot("Uninvolved", 5)
 ```
 
 ```{r distribution_plot}

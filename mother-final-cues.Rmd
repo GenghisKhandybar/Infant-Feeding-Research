@@ -2,10 +2,11 @@
 title: "mother-final-cues"
 author: "William Medwid"
 date: "7/7/2021"
-output: 
-  prettydoc::html_pretty:
-    theme: cayman
-    highlight: github
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
 ---
 
 This analysis excludes bottle rejectors.
@@ -16,6 +17,8 @@ This analysis excludes bottle rejectors.
 include_rejectors <- c(0)
 source("shared_setup.R")
 ```
+
+## Final behaviors
 
 ```{r final_cues}
 final_cue <- data_duration %>% 
@@ -54,6 +57,8 @@ last_cue_counts %>%
 ```
 
 Predictably, the large majority of sessions end with an indication that the session is over.
+
+## Actions in final quarter
 
 ```{r last_quarter}
 num_splits = 4

@@ -2,10 +2,11 @@
 title: "infant_descriptive_statistics"
 author: "William Medwid"
 date: "7/9/2021"
-output: 
-  prettydoc::html_pretty:
-    theme: cayman
-    highlight: github
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
 ---
 
 This analysis excludes bottle rejectors.
@@ -126,7 +127,7 @@ for (states in related){
 ```
 
 
-
+## Group analysis
 
 ```{r}
 df_points <- data_duration %>% 
@@ -156,33 +157,6 @@ df_points %>%
   kable(caption = "Mean and standard deviation of average cues for potent and subtle cues")
 ```
 
-```{r}
-line_plot <- function(group){
-  p <- data_dyad_total_zeros %>% 
-    mutate(any_occurances = if_else(num_occurrences>0, 1, 0)) %>% 
-    filter(dyad_unit=="Baby") %>% 
-    filter(Narrow_group==group) %>% 
-    group_by(Behavior, dyad_set, Narrow_group) %>% 
-    summarise(prop_occurances = round(mean(any_occurances), 2)) %>% 
-    ggplot(aes(x=dyad_set, 
-               y=prop_occurances, 
-               color=Behavior,
-               group=Behavior,
-               linetype=Behavior)) +
-    geom_point()+
-    geom_line() +
-    ylim(0, 1) +
-    ggtitle(paste("Proportion of infants expressing", group, "cues")) +
-    ylab("Proportion expressing cue at least once") +
-    xlab("Baby age")
-  
-  p %>% ggplotly()
-}
-
-line_plot("Potent")
-line_plot("Subtle")
-```
-
 ## Distributions of cues per minute
 
 ```{r}
@@ -210,7 +184,39 @@ line_plot("Potent")
 line_plot("Subtle")
 ```
 
-# Cues/min analysis
+## Proportional analysis
+
+```{r}
+line_plot <- function(group){
+  p <- data_dyad_total_zeros %>% 
+    mutate(any_occurances = if_else(num_occurrences>0, 1, 0)) %>% 
+    filter(dyad_unit=="Baby") %>% 
+    filter(Narrow_group==group) %>% 
+    group_by(Behavior, dyad_set, Narrow_group) %>% 
+    summarise(prop_occurances = round(mean(any_occurances), 2)) %>% 
+    ggplot(aes(x=dyad_set, 
+               y=prop_occurances, 
+               color=Behavior,
+               group=Behavior,
+               linetype=Behavior)) +
+    geom_point()+
+    geom_line() +
+    ylim(0, 1) +
+    ggtitle(paste("Proportion of infants expressing", group, "cues")) +
+    ylab("Proportion expressing cue at least once") +
+    xlab("Baby age")
+  
+  p %>% ggplotly()
+}
+
+line_plot("Potent")
+line_plot("Subtle")
+```
+
+
+## Cues/min analysis
+
+Among infants expressing the cue, how often did they express the cue?
 
 ```{r cues_min_analysis}
 #Commented out code separates outliers into a third plot, allowing easier comparisons.

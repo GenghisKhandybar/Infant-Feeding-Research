@@ -2,7 +2,11 @@
 title: 'Mom Response: All Dyads'
 author: ""
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
 ---
 
 This analysis excludes bottle rejectors.
