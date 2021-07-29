@@ -18,7 +18,7 @@ source("shared_setup.R")
 
 # Cues over the whole duration
 
-```{r}
+```{r bar-grid}
 # Many bar plots -----------
 
 grid_plot <- function(group, num_splits){
@@ -47,6 +47,49 @@ grid_plot <- function(group, num_splits){
     xlab("Split") +
     ylab("Proportion expressing cue within period") +
     theme(strip.text.y.right = element_text(angle = 0)) +
+    ylim(0, 0.6) %>% 
+    return()
+}
+
+grid_plot("Potent", 4)
+grid_plot("Subtle", 4)
+grid_plot("Potent", 5)
+grid_plot("Subtle", 5)
+```
+
+### Swapped barplot grid
+
+To compare dyad ages within each split.
+
+```{r flipped-bar-grid}
+# Many bar plots -----------
+
+grid_plot <- function(group, num_splits){
+  used_behaviors <- behavior_codebook %>% 
+    filter(Narrow_group == group) %>% 
+    pull(Behavior)
+  
+  n_dyads_cue <- data_duration %>% #Cue representation in dyads before the requested time period
+    filter(Behavior %in% used_behaviors) %>% 
+    mutate(split = get_time_split(start_fraction, num_splits)) %>% 
+    distinct(Behavior, dyad_set, id, split) %>% #Removes repeated cues from the same infant within the same feeding
+    group_by(dyad_set, split) %>% 
+    count(Behavior) %>% 
+    mutate(n_dyads = n) %>% 
+    select(!n) %>% 
+    left_join(dyad_set_counts) %>% 
+    mutate(prop_dyads = n_dyads / count)
+  
+
+  n_dyads_cue %>% 
+    ggplot(aes(y=prop_dyads, x = dyad_set)) +
+    geom_bar(position="dodge", stat="identity") +
+    facet_grid(reorder(Behavior, desc(prop_dyads))~split) +
+    ggtitle(paste("Percent of infants expressing ", group, " behaviors in each 1/", num_splits, " of feeding", sep = ""))+
+    xlab("Dyad set (column = split)") +
+    ylab("Proportion expressing cue within period") +
+    theme(strip.text.y.right = element_text(angle = 0)) +
+    theme(axis.text.x = element_text(angle=90)) +
     ylim(0, 0.6) %>% 
     return()
 }
