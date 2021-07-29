@@ -169,6 +169,20 @@ for (states in related){
 }
 ```
 
+```{r}
+total_fractions <- data_duration %>%
+  filter(Behavior %in% c("Crying", "Eyes Closed", "Bottle in mouth")) %>% 
+  filter(Event_Type == "State start") %>%
+  group_by(id, dyad_set, Behavior) %>% 
+  summarise(total_fraction = sum(duration_fraction))
+
+total_fractions %>% 
+  ggplot(aes(x = total_fraction, y = Behavior, col = dyad_set)) +
+  geom_boxplot() +
+  ggtitle("Time in states distribution (all non-rejector dyads)") +
+  xlab("Total fraction of time in state")
+```
+
 
 ## Group analysis
 
