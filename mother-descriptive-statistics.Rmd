@@ -18,7 +18,7 @@ include_rejectors <- c(0)
 source("shared_setup.R")
 ```
 
-## Quarterly and per-quintile proportions
+## Quarterly proportions
 
 ```{r grid_plot}
 # Many bar plots -----------
@@ -60,6 +60,53 @@ grid_plot("Uninvolved", 4)
 # grid_plot("Controlling", 5)
 # grid_plot("Uninvolved", 5)
 ```
+
+### Swapped barplot grid
+
+To compare dyad ages within each split.
+
+```{r flipped_grid_plot}
+# Many bar plots -----------
+
+grid_plot <- function(group, num_splits){
+  used_behaviors <- behavior_codebook %>% 
+    filter(Wide_group == group) %>% 
+    pull(Behavior)
+  
+  
+  n_dyads_cue <- data_duration %>% #Cue representation in dyads before the requested time period
+    filter(Behavior %in% used_behaviors) %>% 
+    mutate(split = get_time_split(start_fraction, num_splits)) %>% 
+    distinct(Behavior, dyad_set, id, split) %>% #Removes repeated cues from the same infant within the same feeding
+    group_by(dyad_set, split) %>% 
+    count(Behavior) %>% 
+    mutate(n_dyads = n) %>% 
+    select(!n) %>% 
+    left_join(dyad_set_counts) %>% 
+    mutate(prop_dyads = n_dyads / count)
+  
+
+  n_dyads_cue %>% 
+    ggplot(aes(y=prop_dyads, x = dyad_set)) +
+    geom_bar(position="dodge", stat="identity") +
+    facet_grid(reorder(Behavior, desc(prop_dyads))~split) +
+    ggtitle(paste("Percent of infants expressing ", group, " behaviors in each 1/", num_splits, " of feeding", sep = ""))+
+    xlab("Dyad set (Column = quarter)") +
+    ylab("Proportion expressing cue within period") +
+    theme(strip.text.y.right = element_text(angle = 0)) +
+    theme(axis.text.x = element_text(angle=90)) +
+    ylim(0, 1) %>% 
+    return()
+}
+
+grid_plot("Responsive", 4)
+grid_plot("Controlling", 4)
+grid_plot("Uninvolved", 4)
+# grid_plot("Responsive", 5)
+# grid_plot("Controlling", 5)
+# grid_plot("Uninvolved", 5)
+```
+
 
 ```{r distribution_plot}
 df_points <- data_duration %>% 
@@ -156,7 +203,7 @@ One unusual finding here is that among four behaviors (3 controlling, one respon
 
 ## Behavior frequencies
 
-The following plots illustrate differences in behaviors per minute.
+The following plots illustrate differences in behaviors per minute. Labelled numbers represent number of observations.
 
 ```{r}
 mother_narrow <- data_dyad_total_zeros %>% 
@@ -170,8 +217,14 @@ for(behavior_type in mother_narrow){
     filter(Narrow_group==behavior_type) %>% 
     mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
     filter(num_per_min > 0) %>% 
+    group_by(Behavior, dyad_set, Narrow_group) %>% 
+    mutate(n_verbose = if_else(num_per_min == max(num_per_min), 
+                                                  paste("", n()), 
+                                                  "")) %>% 
+    ungroup() %>% 
     ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
-    geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
+    geom_boxplot(outlier.alpha = 0.75, outlier.size = 1) +
+    geom_text(aes(label = n_verbose, x = num_per_min), label_padding = 10, position = position_dodge(width = 1)) +
     xlim(0,8) +
     ggtitle(paste(behavior_type)) + 
     xlab("Behaviors per minute")
@@ -189,10 +242,13 @@ data_dyad_total_zeros %>%
   group_by(dyad_set, id, Narrow_group) %>% 
   summarise(sum_num_per_min = sum(num_per_min)) %>% 
   group_by(Narrow_group, dyad_set) %>% 
-  mutate(n = paste("n=", n())) %>% 
+  mutate(n_verbose = if_else(sum_num_per_min == max(sum_num_per_min), 
+                                                    paste("", n()), 
+                                                    "")) %>% 
   mutate(Narrow_group = reorder(Narrow_group, sum_num_per_min, median)) %>% 
   ggplot(aes(y=Narrow_group, x=sum_num_per_min, col=dyad_set)) +
-  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
+  geom_boxplot(outlier.alpha = 0.75, outlier.size = 1) +
+  geom_text(aes(label = n_verbose, x = -0.25), label_padding = 10, position = position_dodge(width = 1)) +
   ggtitle("Mothers' behavior group frequencies (0's excluded)") + 
   xlab("Behaviors per minute")
 ```
