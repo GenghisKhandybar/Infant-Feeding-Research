@@ -159,6 +159,23 @@ get_time_split <- function(x, q) {
 
 ratio_lines = seq(1, 4, 0.5)
 
+# 5 number summary function -----------------
+
+summary_5_num <- function(df_grouped) {
+  df_grouped %>% 
+    summarise(
+      n = n(),
+      min = min(time_before_end),
+      q1 = quantile(time_before_end, 0.25), 
+      median = median(time_before_end), 
+      q3 = quantile(time_before_end, 0.75), 
+      max=max(time_before_end)
+    ) %>% 
+    arrange(-median) %>% 
+    return()
+}
+
+
 # Auto-labeling ----------------------------------------------------
 #Code adapted and improved from: https://www.pogol.net/using-attr-labels-for-ggplot
 # Though interesting, it ended up not being worth the effort because we very rarely use an unmodified dataset to create plots.

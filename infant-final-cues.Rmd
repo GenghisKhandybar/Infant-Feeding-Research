@@ -103,21 +103,13 @@ par(mfrow=c(1,1))
 
 Using the final cues found in the previous plot, this plot shows how close to the end each infant's final cue is. Eyes closed, crying, and not opening the mouth tends to end the feeding quickly, while gags/coughs/chokes and biting/chewing the nipple often happen a longer time before the end.
 
+
+
 ```{r}
 #Table form - time distribution is skewed so median is more useful than mean
 final_cue %>% 
   group_by(Behavior) %>% 
-  summarise(
-    min = min(time_before_end),
-    q1 = quantile(time_before_end, 0.25), 
-    median = median(time_before_end), 
-    q3 = quantile(time_before_end, 0.75), 
-    max=max(time_before_end), 
-    mean = mean(time_before_end),
-    sd = sd(time_before_end),
-    n_obsersvations = n()
-  ) %>% 
-  arrange(median) %>% 
+  summary_5_num() %>% 
   kable(digits=2, caption="Final cues: How many seconds each happens before feeding ends")
 ```
 
