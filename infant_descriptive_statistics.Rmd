@@ -278,49 +278,45 @@ Among infants expressing the cue, how often did they express the cue?
 ```{r cues_min_analysis}
 #Commented out code separates outliers into a third plot, allowing easier comparisons.
 
-#outliers_over <- 2
+give.n <- function(x){
+   return(c(y = mean(x), label = length(x)))
+}
 
-data_dyad_total_zeros %>%
-  filter(dyad_unit == "Baby") %>% 
-  filter(Narrow_group=="Potent") %>%
-  filter(num_per_min>0) %>% 
-  mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-  ggplot(aes(y=Behavior, x=num_per_min, col=dyad_set)) +
-  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-  ggtitle("Potent behhavior frequencies (excluding 0's)") + 
-  xlab("Cues per minute (log base 2 scale)")# +
+freq_boxplot <- function(data_dyad_total_zeros, Narrow_group_used, scaling){
+  if(scaling == "(log base 2 scale)"){
+    x_vals = log(data_dyad_total_zeros$num_per_min)
+  } else{
+    x_vals = data_dyad_total_zeros$num_per_min
+  }
+  
+  data_dyad_total_zeros %>%
+    mutate(x_vals = x_vals) %>% 
+    filter(dyad_unit == "Baby") %>% 
+    filter(Narrow_group == Narrow_group_used) %>%
+    filter(num_per_min>0) %>% 
+    group_by(Behavior, dyad_set) %>% 
+    mutate(n_verbose = if_else(x_vals == max(x_vals),
+                                                  paste("n = ", n()),
+                                                  "")) %>%
+    mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
+    ggplot(aes(y=Behavior, x=x_vals, col=dyad_set)) +
+    geom_boxplot(outlier.alpha = 0.75, outlier.size = 1) +
+    geom_text(aes(label = n_verbose), position = position_dodge(width = 1), hjust="inward") +
+    ggtitle(paste(Narrow_group_used, "behhavior frequencies (excluding 0's)")) +
+    xlab(paste("Cues per minute", scaling))
+}
 
-data_dyad_total_zeros %>%
-  filter(dyad_unit == "Baby") %>% 
-  filter(Narrow_group=="Subtle") %>% 
-  filter(num_per_min>0) %>% 
-  mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-  ggplot(aes(y=Behavior, x=(num_per_min), col=dyad_set)) +
-  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-  ggtitle("Subtle behhavior frequencies (excluding 0's)") + 
-  xlab("Cues per minute (log base 2 scale)")
+data_dyad_total_zeros %>% 
+  freq_boxplot("Potent", "")
 
-# Log scale
+data_dyad_total_zeros %>% 
+  freq_boxplot("Subtle", "")
 
-data_dyad_total_zeros %>%
-  filter(dyad_unit == "Baby") %>% 
-  filter(Narrow_group=="Potent") %>%
-  filter(num_per_min>0) %>% 
-  mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-  ggplot(aes(y=Behavior, x=log2(num_per_min), col=dyad_set)) +
-  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-  ggtitle("Potent behhavior frequencies (excluding 0's)") + 
-  xlab("Cues per minute (log base 2 scale)")# +
+data_dyad_total_zeros %>% 
+  freq_boxplot("Potent", "(log base 2 scale)")
 
-data_dyad_total_zeros %>%
-  filter(dyad_unit == "Baby") %>% 
-  filter(Narrow_group=="Subtle") %>% 
-  filter(num_per_min>0) %>% 
-  mutate(Behavior = reorder(Behavior, num_per_min)) %>% 
-  ggplot(aes(y=Behavior, x=log2(num_per_min), col=dyad_set)) +
-  geom_boxplot(outlier.alpha = 0.25, outlier.size = 1) +
-  ggtitle("Subtle behhavior frequencies (excluding 0's, log scale)") + 
-  xlab("Cues per minute (log base 2 scale)")
+data_dyad_total_zeros %>% 
+  freq_boxplot("Subtle", "(log base 2 scale)")
 ```
 
 
