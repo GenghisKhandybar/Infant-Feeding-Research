@@ -115,7 +115,7 @@ final_cue %>%
 
 This table reflects the previous chart, aggregated over the 4 dyad age groups. The precise mean and median values may have been hard to discern from the plot, so they're shown in the table here.
 
-## Frequency of cues within the last 25% of feeding
+## Proportion expressing cues within the last 25% of feeding
 
 ```{r last_quarter}
 num_splits = 4

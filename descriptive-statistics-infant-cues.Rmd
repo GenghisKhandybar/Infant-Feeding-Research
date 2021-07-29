@@ -142,7 +142,7 @@ ggplot(video_lengths_individual %>%
        aes(x = id, y = video_length/60, col = dyad_set)) +
   coord_flip() +
   ggtitle("Infants observed at all time points") +
-  xlab("Video length (minutes)") +
+  ylab("Video length (minutes)") +
   geom_point(aes(shape = Bottle_Rejector)) +
   scale_shape_manual(values = c(1, 4))
 
