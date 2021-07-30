@@ -46,68 +46,48 @@ p %>%  ggplotly(tooltip = "text")
 
 ## 2. For each infant cue, what happens “next”?  How long?
 
-The following plots display the prevalence of each mother reaction to each infant cue. The following plot only shows behaviors directly following an infant behavior.
+<!-- The following plots display the prevalence of each mother reaction to each infant cue. The following plot only shows behaviors directly following an infant behavior. -->
 
-```{r}
-infant_interactions <- data_duration %>%
-  mutate(next_behavior = lead(Behavior), next_dyad_unit = lead(dyad_unit)) %>% 
-  filter(dyad_unit == "Baby") %>% 
-  filter(next_dyad_unit == "Mom") %>%
-  group_by(Behavior, next_behavior) %>% 
-  summarise(num_count = n()) %>% 
-  group_by(Behavior) %>% 
-  mutate(following_prop = num_count / sum(num_count),
-         n_total = sum(num_count)) %>% 
-  mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
-         next_behavior = reorder(next_behavior, num_count, max))
+<!-- ```{r} -->
+<!-- infant_interactions <- data_duration %>% -->
+<!--   mutate(next_behavior = lead(Behavior), next_dyad_unit = lead(dyad_unit)) %>%  -->
+<!--   filter(dyad_unit == "Baby") %>%  -->
+<!--   filter(next_dyad_unit == "Mom") %>% -->
+<!--   group_by(Behavior, next_behavior) %>%  -->
+<!--   summarise(num_count = n()) %>%  -->
+<!--   group_by(Behavior) %>%  -->
+<!--   mutate(following_prop = num_count / sum(num_count), -->
+<!--          n_total = sum(num_count)) %>%  -->
+<!--   mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet -->
+<!--          next_behavior = reorder(next_behavior, num_count, max)) -->
 
 
 
-heat_plot <- function(infant_interactions, used_next, title){
-  infant_interactions %>% 
-    filter(next_behavior %in% used_next) %>% 
-    ggplot(aes(y = Behavior, 
-               x = next_behavior, 
-               col = following_prop,
-               text = paste("Behavior: ", Behavior,
-                            "\n Response: ", next_behavior,
-                            "\nProp. following: ", round(following_prop, 2), " (", num_count, "/", n_total, ")",
-                            sep=""))) +
-    geom_point(shape = "square", size = 2.5) + #bootleg heatmap
-    coord_equal() +
-    scale_color_continuous(type = "viridis") +
-    theme(axis.text.x = element_text(angle = 90, hjust= 1)) +
-    ylab("Original behavior") +
-    xlab("Response to behavior") +
-    ggtitle(title)
-}
-# Plots split by prevelance ----
+<!-- heat_plot <- function(infant_interactions, used_next, title){ -->
+<!--   infant_interactions %>%  -->
+<!--     filter(next_behavior %in% used_next) %>%  -->
+<!--     ggplot(aes(y = Behavior,  -->
+<!--                x = next_behavior,  -->
+<!--                col = following_prop, -->
+<!--                text = paste("Behavior: ", Behavior, -->
+<!--                             "\n Response: ", next_behavior, -->
+<!--                             "\nProp. following: ", round(following_prop, 2), " (", num_count, "/", n_total, ")", -->
+<!--                             sep=""))) + -->
+<!--     geom_point(shape = "square", size = 2.5) + #bootleg heatmap -->
+<!--     coord_equal() + -->
+<!--     scale_color_continuous(type = "viridis") + -->
+<!--     theme(axis.text.x = element_text(angle = 90, hjust= 1)) + -->
+<!--     ylab("Original behavior") + -->
+<!--     xlab("Response to behavior") + -->
+<!--     ggtitle(title) -->
+<!-- } -->
 
-# top_mom_behaviors <- infant_interactions %>% 
-#   group_by(next_behavior) %>% 
-#   summarise(n = max(num_count)) %>% 
-#   arrange(n) %>% 
-#   top_n(3) %>% 
-#   pull(next_behavior)
-# 
-# bottom_mom_behaviors <- behavior_codebook %>% 
-#   filter(dyad_unit == "Mom") %>% 
-#   filter(!Behavior %in% top_mom_behaviors) %>% 
-#   pull(Behavior)
-# 
-# infant_interactions %>% 
-#   heat_plot(top_mom_behaviors, "Most common mother behaviors") %>% 
-#   ggplotly(tooltip = "text")
-# 
-# infant_interactions %>% 
-#   heat_plot(bottom_mom_behaviors, "Least common mother behaviors") %>% 
-#   ggplotly()
 
-infant_interactions %>% 
-  heat_plot(behavior_codebook %>% 
-  filter(dyad_unit == "Mom") %>% pull(Behavior), "Immediate responses to infant behaviors") %>% 
-  ggplotly(tooltip = "text")
-```
+<!-- infant_interactions %>%  -->
+<!--   heat_plot(behavior_codebook %>%  -->
+<!--   filter(dyad_unit == "Mom") %>% pull(Behavior), "Immediate responses to infant behaviors") %>%  -->
+<!--   ggplotly(tooltip = "text") -->
+<!-- ``` -->
 
 The following plots show the behavior following a group of behaviors.
 
