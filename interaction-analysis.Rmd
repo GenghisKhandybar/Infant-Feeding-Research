@@ -1,0 +1,57 @@
+---
+title: "interaction-analysis"
+author: "William Medwid"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: false
+---
+
+This analysis includes bottle rejectors and non-rejectors.
+
+```{r setup, include=FALSE}
+include_rejectors <- c(0, 1)
+source("shared_setup.R")
+```
+
+
+## 1. Plot number of cues versus number of mom behaviors (per length of feeding) for dyads across ages, in total and for some of the specific cue-behavior comparisons in Dr. Ventura’s notes.
+
+```{r}
+p <- data_dyad_total_zeros %>% 
+  group_by(id, dyad_set, dyad_unit) %>% 
+  summarise(total_apm = sum(num_per_min), feeding_minutes = max(video_mins)) %>% 
+  pivot_wider(id_cols = c(id, dyad_set), names_from = dyad_unit, values_from = c(total_apm, feeding_minutes)) %>% 
+  ggplot(aes(x = total_apm_Baby, 
+             y = total_apm_Mom, 
+             col = dyad_set,
+             text = paste("Mother:", total_apm_Mom,
+                          "\nBaby:", total_apm_Baby,
+                          "\nFeeding mins:", feeding_minutes_Baby,
+                          "\nid:", id,
+                          "\nDyad set:", dyad_set)
+             )) +
+  geom_point(alpha = 0.35) +
+  geom_smooth(aes(x = total_apm_Baby, y = total_apm_Mom), method = "lm", inherit.aes = FALSE) + #the text aes broke geom_smooth, so it's removed.
+  facet_grid(cols = vars(dyad_set)) +
+  xlab("Baby cues per minute") +
+  ylab("Mom behaviors per minute")
+
+p %>%  ggplotly(tooltip = "text")
+```
+
+## 2. For each infant cue, what happens “next”?  How long?
+
+```{r}
+
+```
+
+
+## 3. For each mom behavior, what happened “before”? How long?
+
+```{r}
+
+```
+
