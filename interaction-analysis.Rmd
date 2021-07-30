@@ -46,7 +46,7 @@ p %>%  ggplotly(tooltip = "text")
 
 ## 2. For each infant cue, what happens “next”?  How long?
 
-The following plots display the prevalence of each mother reaction to each infant cue. They only show mother behaviors which directly follow infant cues.
+The following plots display the prevalence of each mother reaction to each infant cue. The following plot only shows behaviors directly following an infant behavior.
 
 ```{r}
 infant_interactions <- data_duration %>%
@@ -69,18 +69,17 @@ heat_plot <- function(infant_interactions, used_next, title){
     ggplot(aes(y = Behavior, 
                x = next_behavior, 
                col = following_prop,
-               text = paste("Baby cue: ", Behavior,
-                            "\nNext mom behavior: ", next_behavior,
+               text = paste("Behavior: ", Behavior,
+                            "\n Response: ", next_behavior,
                             "\nProp. following: ", round(following_prop, 2), " (", num_count, "/", n_total, ")",
                             sep=""))) +
-    geom_point(shape = "square", size = 3) + 
+    geom_point(shape = "square", size = 2.5) + #bootleg heatmap
     coord_equal() +
     scale_color_continuous(type = "viridis") +
     theme(axis.text.x = element_text(angle = 90, hjust= 1)) +
-    ylab("Infant behavior") +
-    xlab("Mom behavior immediately following") +
+    ylab("Original behavior") +
+    xlab("Response to behavior") +
     ggtitle(title)
-
 }
 # Plots split by prevelance ----
 
@@ -106,14 +105,60 @@ heat_plot <- function(infant_interactions, used_next, title){
 
 infant_interactions %>% 
   heat_plot(behavior_codebook %>% 
-  filter(dyad_unit == "Mom") %>% pull(Behavior), "All mother behaviors") %>% 
+  filter(dyad_unit == "Mom") %>% pull(Behavior), "Immediate responses to infant behaviors") %>% 
   ggplotly(tooltip = "text")
 ```
+
+The following plots show the behavior following a group of behaviors.
+
+```{r}
+interaction_data <- data_duration %>% 
+  mutate(next_dyad_unit = lead(dyad_unit),
+         switch = if_else(next_dyad_unit == dyad_unit, 0, 1)) %>% 
+  group_by(id, dyad_set) %>% 
+  mutate(chain_group = cumsum(switch) - switch) %>%  #Switch == 1 at end of group, chain group changes at start of new group
+  ungroup() %>% 
+  mutate(next_behavior = if_else(switch == 1, lead(Behavior), "NA")) %>% 
+
+  group_by(id, dyad_set, chain_group) %>% 
+  mutate(next_behavior = if_else(next_behavior == "NA", last(next_behavior), next_behavior))
+    
+infant_interactions <- interaction_data %>% 
+  filter(dyad_unit == "Baby") %>% 
+  group_by(Behavior, next_behavior) %>% 
+  summarise(num_count = n()) %>% 
+  group_by(Behavior) %>% 
+  mutate(following_prop = num_count / sum(num_count),
+         n_total = sum(num_count)) %>% 
+  mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
+         next_behavior = reorder(next_behavior, num_count, max))
+
+infant_interactions %>% 
+  heat_plot(behavior_codebook %>% 
+  filter(dyad_unit == "Mom") %>% pull(Behavior), "First responses to infant behaviors") %>% 
+  ggplotly(tooltip = "text")
+```
+
+
 
 
 ## 3. For each mom behavior, what happened “before”? How long?
 
 ```{r}
+mother_interactions <- interaction_data %>% 
+  filter(dyad_unit == "Mom") %>% 
+  group_by(Behavior, next_behavior) %>% 
+  summarise(num_count = n()) %>% 
+  group_by(Behavior) %>% 
+  mutate(following_prop = num_count / sum(num_count),
+         n_total = sum(num_count)) %>% 
+  mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
+         next_behavior = reorder(next_behavior, num_count, max))
 
+mother_interactions %>% 
+  heat_plot(behavior_codebook %>% 
+  filter(dyad_unit == "Baby") %>% pull(Behavior), "First responses to mother behaviors") %>% 
+  ggplotly(tooltip = "text")
 ```
 
+### TODO next: how long after?
