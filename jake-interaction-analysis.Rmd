@@ -1,0 +1,150 @@
+---
+title: "Jake Interaction Analysis"
+author: "Jake Esprabens"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+include_rejectors <- c(0, 1)
+source("shared_setup.R")
+```
+
+# 3. When the state is bottle-offer and infant cues occur (especially Blocks mouth and Lip compression, but others, too):
+
+```{r}
+interaction_data <- data_duration %>% 
+  mutate(next_dyad_unit = lead(dyad_unit),
+         switch = if_else(next_dyad_unit == dyad_unit, 0, 1)) %>% 
+  group_by(id, dyad_set) %>% 
+  mutate(chain_group = cumsum(switch) - switch) %>%  #Switch == 1 at end of group, chain group changes at start of new group
+  ungroup() %>% 
+  mutate(next_behavior = if_else(switch == 1, lead(Behavior), "NA")) %>% 
+  group_by(id, dyad_set, chain_group) %>% 
+  mutate(next_behavior = if_else(next_behavior == "NA", last(next_behavior), next_behavior)) %>%
+  
+  ungroup() %>%
+  mutate(prev_behavior = if_else(lag(switch) == 1, lag(Behavior), NULL)) %>%
+  # group_by(id, dyad_set, chain_group) %>% 
+  # mutate(prev_behavior = if_else(prev_behavior == "NA", last(prev_behavior), prev_behavior))
+  mutate(next_behavior_group = case_when(
+      next_behavior == "Pushes bottle into infant's mouth" ~ "Controlling",
+      next_behavior == "Verbal stimulation of sucking or feeding" ~ "Controlling",
+      next_behavior == "Physical stimulation of sucking or feeding" ~ "Controlling",
+      next_behavior == "Verbal acknowledgement of fullness" ~ "Responsive",
+      next_behavior == "Verbal acknowledgement of hunger" ~ "Responsive",
+      next_behavior == "Bottle not in mouth" ~ "Responsive",
+      next_behavior == "Indicates feeding is over" ~ "Responsive",
+      TRUE ~ 'Other'
+  ))
+```
+
+## a,b) How often does this lead to a controlling maternal behavior (Pushes bottle into infant's mouth, Verbal stimulation of sucking or feeding, Physical stimulation of sucking or feeding)? How often does this lead to responsive behaviors (Verbal acknowledgement of fullness (or hunger), bottle-not-in-mouth, Indicates feeding is over)?
+
+```{r}
+interaction_data %>%
+  select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch) %>%
+  filter(prev_behavior == "Bottle offered",
+         dyad_unit == "Baby") %>%
+  ggplot(aes(fill = next_behavior_group, x=Behavior)) +
+  geom_bar(position="stack",stat ="count") + 
+  labs(fill="Next Behavior") +
+  theme(axis.title.x=element_blank()) +
+  coord_flip() +
+  ggtitle("Number of Behaviors for each \nInfant Cue After Bottle is Offered")+
+  theme(plot.title = element_text(size=12))
+
+
+interaction_data %>%
+  select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch) %>%
+  filter(prev_behavior == "Bottle offered",
+         dyad_unit == "Baby") %>%
+  ggplot(aes(fill = next_behavior_group, x=Behavior)) +
+  geom_bar(position="fill",stat ="count") + 
+  labs(fill="Next Behavior") +
+  theme(axis.title.x=element_blank()) +
+  coord_flip() +
+  ggtitle("Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")+
+  theme(plot.title = element_text(size=12))
+
+
+interaction_data %>%
+  select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch) %>%
+  filter(prev_behavior == "Bottle offered",
+         dyad_unit == "Baby",
+         Behavior == "Lip compression/does not open mouth" |
+         Behavior == "Blocks mouth with hands or feet") %>%
+  ggplot(aes(fill = next_behavior_group, x=Behavior)) +
+  geom_bar(position="fill",stat ="count") + 
+  labs(fill="Next Behavior") +
+  theme(axis.title.x=element_blank()) +
+  coord_flip() +
+  ggtitle("Proportion of Behaviors for Lip Compression \nand Blocks mouth After Bottle is Offered")+
+  theme(plot.title = element_text(size=12))
+
+
+interaction_data %>%
+  select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch) %>%
+  filter(prev_behavior == "Bottle offered",
+         dyad_unit == "Baby") %>%
+  ggplot(aes(fill = next_behavior, x=Behavior)) +
+  geom_bar(position="fill",stat ="count") + 
+  labs(fill="Next Behavior") +
+  theme(axis.title.x=element_blank()) +
+  coord_flip() +
+  ggtitle("Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")+
+  theme(plot.title = element_text(size=12))
+```
+
+## c) How many subsequent bottle-offers occur until mother indicates feed is over?
+
+```{r}
+median.quartile <- function(x){
+  out <- quantile(x, probs = c(0.25,0.5,0.75))
+  names(out) <- c("ymin","y","ymax")
+  return(out) 
+}
+
+interaction_data %>%
+  filter(prev_behavior == "Bottle offered" | Behavior == "Indicates feeding is over") %>%
+  select(dyad_unit, dyad_set, id, prev_behavior, Behavior) %>%
+  mutate(prev_behavior = replace_na(prev_behavior, "NA")) %>%
+  group_by(dyad_set, id) %>%
+  summarise(count = sum(prev_behavior == "Bottle offered")) %>%
+  ggplot(aes(x = dyad_set, y = count, color = dyad_set)) +
+  geom_violin(outlier.colour="black", outlier.shape=16,
+             outlier.size=2, notch=FALSE,
+             draw_quantiles = c(0.25, 0.5, 0.75)) +
+  geom_jitter(width=0.15, height=0.05, alpha=0.5, size=0.75) +
+  coord_flip() + 
+  xlab("") + 
+  ylab("") + 
+  theme(legend.position = "none") +
+  theme(panel.grid.major.y = element_blank()) +
+  ggtitle("Number of Bottle Offers Until \nMom Indicates Feed is Over") +
+  scale_x_discrete(limits = rev)
+
+interaction_data %>%
+  filter(prev_behavior == "Bottle offered" | Behavior == "Indicates feeding is over") %>%
+  select(dyad_unit, dyad_set, id, prev_behavior, Behavior) %>%
+  mutate(prev_behavior = replace_na(prev_behavior, "NA")) %>%
+  group_by(dyad_set, id) %>%
+  summarise(count = sum(prev_behavior == "Bottle offered")) %>%
+  ggplot(aes(x = dyad_set, y = log(count + 1), color = dyad_set)) +
+  geom_violin(outlier.colour="black", outlier.shape=16,
+             outlier.size=2, notch=FALSE,
+             draw_quantiles = c(0.25, 0.5, 0.75)) +
+  geom_jitter(width=0.15, height=0.05, alpha=0.5, size=0.75) +
+  coord_flip() + 
+  xlab("") + 
+  ylab("") + 
+  theme(legend.position = "none") +
+  theme(panel.grid.major.y = element_blank()) +
+  ggtitle("Log(x+1) of Number of Bottle Offers Until \nMom Indicates Feed is Over") +
+  scale_x_discrete(limits = rev)
+```
+
