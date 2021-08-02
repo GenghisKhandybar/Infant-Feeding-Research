@@ -175,6 +175,25 @@ summary_5_num <- function(df_grouped) {
     return()
 }
 
+# get_group function -----------------------------
+
+get_group <- function(behaviors, width){
+  # input: vector of behavior strings, and "wide" or "narrow".   
+  # output: vector of grouped behaviors
+  
+  if(width == "wide") {
+    data.frame(Behavior = behaviors) %>% 
+      left_join(behavior_codebook %>% 
+                  select(Behavior, Wide_group), on = Behavior) %>% 
+      pull(Wide_group)
+  } 
+  if(width == "narrow"){
+    data.frame(Behavior = behaviors) %>% 
+      left_join(behavior_codebook %>% 
+                  select(Behavior, Narrow_group), on = Behavior) %>% 
+      pull(Narrow_group)
+  }
+}
 
 # Auto-labeling ----------------------------------------------------
 #Code adapted and improved from: https://www.pogol.net/using-attr-labels-for-ggplot

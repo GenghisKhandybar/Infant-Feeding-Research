@@ -104,6 +104,28 @@ infant_interactions %>%
   ggplotly(tooltip = "text")
 ```
 
+```{r}
+infant_interactions <- interaction_data %>% 
+  filter(dyad_unit == "Baby") %>% 
+  filter(Time_Relative_sf > 0) %>% #Starting conditions don't really count
+  filter(!is.na(next_behavior)) %>%  
+  mutate(next_behavior = get_group(next_behavior, "narrow")) %>% 
+  group_by(Behavior, next_behavior) %>% 
+  summarise(num_count = n()) %>% 
+  group_by(Behavior) %>% 
+  mutate(following_prop = num_count / sum(num_count),
+         n_total = sum(num_count)) #%>% 
+  # mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
+  #        next_behavior = reorder(next_behavior, num_count, max))
+
+
+
+infant_interactions %>% 
+  heat_plot(behavior_codebook %>% 
+  filter(dyad_unit == "Mom") %>% pull(Narrow_group), "First responses to infant behaviors (by category)") %>% 
+  ggplotly(tooltip = "text")
+```
+
 The following plots show the behavior following a group of behaviors.
 
 
@@ -123,6 +145,26 @@ mother_interactions <- interaction_data %>%
 mother_interactions %>% 
   heat_plot(behavior_codebook %>% 
   filter(dyad_unit == "Baby") %>% pull(Behavior), "First responses to mother behaviors") %>% 
+  ggplotly(tooltip = "text")
+```
+
+```{r}
+mother_interactions <- interaction_data %>% 
+  filter(dyad_unit == "Mom") %>% 
+  filter(Time_Relative_sf > 0) %>% #Starting conditions don't really count
+  filter(!is.na(next_behavior)) %>%
+  mutate(next_behavior = get_group(next_behavior, "narrow")) %>% 
+  group_by(Behavior, next_behavior) %>% 
+  summarise(num_count = n()) %>% 
+  group_by(Behavior) %>% 
+  mutate(following_prop = num_count / sum(num_count),
+         n_total = sum(num_count)) %>% 
+  mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
+         next_behavior = reorder(next_behavior, num_count, max))
+
+mother_interactions %>% 
+  heat_plot(behavior_codebook %>% 
+  filter(dyad_unit == "Baby") %>% pull(Narrow_group), "First responses to mother behaviors") %>% 
   ggplotly(tooltip = "text")
 ```
 
@@ -189,3 +231,4 @@ p %>% ggplotly(tooltip = "text")
 ```
 
 Other than a few outliers, this mainly shows that most behaviors have similarly quick response times. Further analysis could reveal more significant differences.
+
