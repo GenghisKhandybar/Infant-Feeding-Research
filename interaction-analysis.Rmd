@@ -46,10 +46,27 @@ p %>%  ggplotly(tooltip = "text")
 
 ## 2. For each infant cue, what happens “next”?  How long?
 
-
 ```{r}
-heat_plot <- function(infant_interactions, used_next, title){
-  infant_interactions %>%
+interaction_data <- data_duration %>% 
+  group_by(id, dyad_set) %>% 
+  mutate(next_dyad_unit = lead(dyad_unit),
+         switch = if_else(next_dyad_unit == dyad_unit, 0, 1),
+         chain_group = cumsum(switch) - switch) %>% #Switch = 1 at end of group, chain group changes at start of new group
+  ungroup() %>% 
+  mutate(next_behavior = if_else(switch == 1, lead(Behavior), NULL),
+         next_time = if_else(switch == 1, lead(Time_Relative_sf), NULL)) %>% 
+  group_by(id, dyad_set, chain_group) %>% 
+  mutate(next_behavior = if_else(is.na(next_behavior), last(next_behavior), next_behavior),
+         next_time = if_else(is.na(next_time), last(next_time), next_time),
+         time_until_next = next_time - Time_Relative_sf)
+
+# interaction_data %>% arrange(time_until_next)
+# interaction_data %>% select(Time_Relative_sf, Behavior, dyad_unit, switch, chain_group, next_time, time_until_next) %>% arrange(time_until_next)
+```
+
+```{r heat_plot_function}
+heat_plot <- function(interactions, used_next, title){
+  interactions %>%
     filter(next_behavior %in% used_next) %>%
     ggplot(aes(y = Behavior,
                x = next_behavior,
@@ -68,22 +85,11 @@ heat_plot <- function(infant_interactions, used_next, title){
 }
 ```
 
-The following plots show the behavior following a group of behaviors.
 
 ```{r}
-interaction_data <- data_duration %>% 
-  mutate(next_dyad_unit = lead(dyad_unit),
-         switch = if_else(next_dyad_unit == dyad_unit, 0, 1)) %>% 
-  group_by(id, dyad_set) %>% 
-  mutate(chain_group = cumsum(switch) - switch) %>%  #Switch == 1 at end of group, chain group changes at start of new group
-  ungroup() %>% 
-  mutate(next_behavior = if_else(switch == 1, lead(Behavior), "NA")) %>% 
-
-  group_by(id, dyad_set, chain_group) %>% 
-  mutate(next_behavior = if_else(next_behavior == "NA", last(next_behavior), next_behavior))
-    
 infant_interactions <- interaction_data %>% 
   filter(dyad_unit == "Baby") %>% 
+  filter(Time_Relative_sf > 0) %>% #Starting conditions don't really count
   group_by(Behavior, next_behavior) %>% 
   summarise(num_count = n()) %>% 
   group_by(Behavior) %>% 
@@ -97,6 +103,9 @@ infant_interactions %>%
   filter(dyad_unit == "Mom") %>% pull(Behavior), "First responses to infant behaviors") %>% 
   ggplotly(tooltip = "text")
 ```
+
+The following plots show the behavior following a group of behaviors.
+
 
 ## 3. For each mom behavior, what happened “before”? How long?
 
@@ -117,4 +126,66 @@ mother_interactions %>%
   ggplotly(tooltip = "text")
 ```
 
-### TODO next: how long after?
+### How long after each behavior is the response?
+
+```{r}
+interaction_data$time_until_next %>% 
+  summary()
+
+time_interactions <- interaction_data %>% 
+  filter(!is.na(next_behavior)) %>% 
+  group_by(Behavior, next_behavior, dyad_unit) %>% 
+  summarise(num_count = n(),
+            q1_time = quantile(time_until_next, 0.25),
+            med_time = median(time_until_next),
+            q3_time = quantile(time_until_next, 0.75))
+
+p <- time_interactions %>% 
+  filter(dyad_unit == "Baby") %>% 
+  ggplot(aes(y = Behavior,
+             x = next_behavior,
+             col = med_time,
+             text = paste("Behavior: ", Behavior,
+                          "\nResponse: ", next_behavior,
+                          "\nn :", num_count,
+                          "\nTime between cue and response ---",
+                          "\nq1 time: ", q1_time,
+                          "\nMedian Time: ", as.character(med_time),
+                          "\nq3 time: ", q3_time,
+                          sep=""))) +
+  geom_point(shape = "square", size = 3) + #bootleg heatmap
+  scale_color_continuous(type = "viridis") +
+  theme(axis.text.x = element_text(angle = 90, hjust= 1)) +
+  coord_equal() +
+  ylab("Original behavior") +
+  xlab("Response to behavior") +
+  ggtitle("Baby cue response times")
+
+p %>% ggplotly(tooltip = "text")
+
+p <- time_interactions %>% 
+  filter(dyad_unit == "Mom") %>% 
+  ggplot(aes(y = Behavior,
+             x = next_behavior,
+             col = med_time,
+             text = paste("Behavior: ", Behavior,
+                          "\nResponse: ", next_behavior,
+                          "\nn :", num_count,
+                          "\nTime between cue and response ---",
+                          "\nq1 time: ", q1_time,
+                          "\nMedian Time: ", as.character(med_time),
+                          "\nq3 time: ", q3_time,
+                          sep=""))) +
+  geom_point(shape = "square", size = 3) + #bootleg heatmap
+  scale_color_continuous(type = "viridis") +
+  theme(axis.text.x = element_text(angle = 90, hjust= 1)) +
+  coord_equal() +
+  ylab("Original behavior") +
+  xlab("Response to behavior") +
+  ggtitle("Mom behavior response times")
+
+p %>% ggplotly(tooltip = "text")
+
+```
+
+Other than a few outliers, this mainly shows that most behaviors have similarly quick response times. Further analysis could reveal more significant differences.
