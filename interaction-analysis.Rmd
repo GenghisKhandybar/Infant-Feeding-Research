@@ -83,6 +83,12 @@ heat_plot <- function(interactions, used_next, title){
     xlab("Response to behavior") +
     ggtitle(title)
 }
+heat_table <- function(interactions, used_next){
+  interactions %>%
+    mutate(prop_verbose = paste(round(following_prop, 2), " (", num_count, "/", n_total, ")", sep = "")) %>%
+    filter(next_behavior %in% used_next) %>%
+    pivot_wider(id_cols = Behavior, names_from = next_behavior, values_from = prop_verbose)
+}
 ```
 
 
@@ -98,10 +104,15 @@ infant_interactions <- interaction_data %>%
   mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
          next_behavior = reorder(next_behavior, num_count, max))
 
+responses = behavior_codebook %>% filter(dyad_unit == "Mom") %>% pull(Behavior)
+
 infant_interactions %>% 
-  heat_plot(behavior_codebook %>% 
-  filter(dyad_unit == "Mom") %>% pull(Behavior), "First responses to infant behaviors") %>% 
+  heat_plot(responses, "First responses to infant behaviors") %>% 
   ggplotly(tooltip = "text")
+
+infant_interactions %>% 
+  heat_table(responses) %>% 
+  kable()
 ```
 
 ```{r}
@@ -118,12 +129,16 @@ infant_interactions <- interaction_data %>%
   # mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
   #        next_behavior = reorder(next_behavior, num_count, max))
 
-
+responses <- behavior_codebook %>% filter(dyad_unit == "Mom") %>% pull(Narrow_group)
 
 infant_interactions %>% 
   heat_plot(behavior_codebook %>% 
   filter(dyad_unit == "Mom") %>% pull(Narrow_group), "First responses to infant behaviors (by category)") %>% 
   ggplotly(tooltip = "text")
+
+infant_interactions %>% 
+  heat_table(responses) %>% 
+  kable()
 ```
 
 The following plots show the behavior following a group of behaviors.
@@ -142,10 +157,15 @@ mother_interactions <- interaction_data %>%
   mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
          next_behavior = reorder(next_behavior, num_count, max))
 
+responses <- behavior_codebook %>% filter(dyad_unit == "Baby") %>% pull(Behavior)
+
 mother_interactions %>% 
-  heat_plot(behavior_codebook %>% 
-  filter(dyad_unit == "Baby") %>% pull(Behavior), "First responses to mother behaviors") %>% 
+  heat_plot(responses, "First responses to mother behaviors") %>% 
   ggplotly(tooltip = "text")
+
+mother_interactions %>% 
+  heat_table(responses) %>% 
+  kable()
 ```
 
 ```{r}
@@ -176,7 +196,7 @@ interaction_data$time_until_next %>%
 
 time_interactions <- interaction_data %>% 
   filter(!is.na(next_behavior)) %>% 
-  group_by(Behavior, next_behavior, dyad_unit) %>% 
+  group_by(Behavior, next_behavior, dyad_unit, dyad_set) %>% 
   summarise(num_count = n(),
             q1_time = quantile(time_until_next, 0.25),
             med_time = median(time_until_next),
@@ -199,6 +219,7 @@ p <- time_interactions %>%
   scale_color_continuous(type = "viridis") +
   theme(axis.text.x = element_text(angle = 90, hjust= 1)) +
   coord_equal() +
+#  facet_grid(cols = vars(dyad_set)) +
   ylab("Original behavior") +
   xlab("Response to behavior") +
   ggtitle("Baby cue response times")
