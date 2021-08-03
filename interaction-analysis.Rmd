@@ -49,6 +49,18 @@ p %>%  ggplotly(tooltip = "text")
 <!-- interaction_data is now included in data_duration -->
 
 ```{r heat_plot_function}
+process_interactions <- function(data_duration, dyad_unit_response, facet){
+  data_duration %>% 
+    filter(dyad_unit == dyad_unit_response) %>%
+    filter(Time_Relative_sf > 0) %>% #Starting conditions don't really count
+    group_by(across(all_of(c("Behavior", "next_behavior", facet)))) %>% 
+    summarise(num_count = n()) %>%
+    group_by(across(all_of(c("Behavior", facet)))) %>% 
+    mutate(following_prop = num_count / sum(num_count),
+           n_total = sum(num_count)) %>%
+    return()
+}
+
 heat_plot <- function(interactions, used_next, title){
   interactions %>%
     filter(next_behavior %in% used_next) %>%
@@ -68,71 +80,57 @@ heat_plot <- function(interactions, used_next, title){
     ggtitle(title)
 }
 
-heat_table <- function(interactions, used_next){
+heat_table <- function(interactions, used_next, facet){
   interactions %>%
     mutate(prop_verbose = paste(round(following_prop, 2), " (", num_count, "/", n_total, ")", sep = "")) %>%
     filter(next_behavior %in% used_next) %>%
-    pivot_wider(id_cols = Behavior, names_from = next_behavior, values_from = prop_verbose)
+    pivot_wider(id_cols = c("Behavior", facet), names_from = next_behavior, values_from = prop_verbose) %>% 
+    arrange(across(all_of(c(facet)))) %>% 
+    return()
 }
 ```
 
 
-```{r}
-infant_interactions <- data_duration %>% 
-  filter(dyad_unit == "Baby") %>% 
-  filter(Time_Relative_sf > 0) %>% #Starting conditions don't really count
-  group_by(Behavior, next_behavior, bottle_state) %>% 
-  summarise(num_count = n()) %>% 
-  group_by(Behavior, bottle_state) %>% 
-  mutate(following_prop = num_count / sum(num_count),
-         n_total = sum(num_count)) %>% 
-  mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
-         next_behavior = reorder(next_behavior, num_count, max))
+```{r first-set-infant}
+infant_interactions <- data_duration %>% process_interactions("Baby", "bottle_state")
 
 responses = behavior_codebook %>% filter(dyad_unit == "Mom") %>% pull(Behavior)
 
-p <- infant_interactions %>% 
+infant_interactions %>% 
   filter(bottle_state == "Bottle in mouth") %>% 
-  heat_plot(responses, "First responses to infant behaviors - Bottle in mouth")
-ggplotly(p, tooltip = "text")
-
-p <- infant_interactions %>% 
-  filter(bottle_state == "Bottle not in mouth") %>% 
-  heat_plot(responses, "First responses to infant behaviors - Bottle not in mouth")
-ggplotly(p, tooltip = "text")
-
-p <- infant_interactions %>% 
-  filter(bottle_state == "Bottle offered") %>% 
-  heat_plot(responses, "First responses to infant behaviors - Bottle offered")
-ggplotly(p, tooltip = "text")
+  heat_plot(responses, "First responses to infant behaviors - Bottle in mouth") %>% 
+  ggplotly(tooltip = "text")
 
 infant_interactions %>% 
-  heat_table(responses) %>% 
+  filter(bottle_state == "Bottle not in mouth") %>% 
+  heat_plot(responses, "First responses to infant behaviors - Bottle in mouth") %>% 
+  ggplotly(tooltip = "text")
+
+infant_interactions %>% 
+  filter(bottle_state == "Bottle offered") %>% 
+  heat_plot(responses, "First responses to infant behaviors - Bottle in mouth") %>% 
+  ggplotly(tooltip = "text")
+
+
+infant_interactions %>% 
+  heat_table(responses, "bottle_state") %>% 
   kable()
 ```
 
 ```{r}
 infant_interactions <- data_duration %>% 
-  filter(dyad_unit == "Baby") %>% 
-  filter(Time_Relative_sf > 0) %>% #Starting conditions don't really count
-  filter(!is.na(next_behavior)) %>%  
   mutate(next_behavior = get_group(next_behavior, "narrow")) %>% 
-  group_by(Behavior, next_behavior) %>% 
-  summarise(num_count = n()) %>% 
-  group_by(Behavior) %>% 
-  mutate(following_prop = num_count / sum(num_count),
-         n_total = sum(num_count)) #%>% 
-  # mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
-  #        next_behavior = reorder(next_behavior, num_count, max))
+  process_interactions("Baby", "dyad_set")
+
 
 responses <- behavior_codebook %>% filter(dyad_unit == "Mom") %>% pull(Narrow_group)
 
-infant_interactions %>% 
-  heat_plot(responses, "First responses to infant behaviors (by category)") %>% 
-  ggplotly(tooltip = "text")
+p <- infant_interactions %>% 
+  heat_plot(responses, "First responses to infant behaviors (by category)") + facet_grid(cols = vars(dyad_set))
+p %>% ggplotly(tooltip = "text")
 
 infant_interactions %>% 
-  heat_table(responses) %>% 
+  heat_table(responses, "dyad_set") %>% 
   kable()
 ```
 
@@ -142,45 +140,53 @@ The following plots show the behavior following a group of behaviors.
 ## 3. For each mom behavior, what happened “before”? How long?
 
 ```{r}
-mother_interactions <- data_duration %>% 
-  filter(dyad_unit == "Mom") %>% 
-  group_by(Behavior, next_behavior) %>% 
-  summarise(num_count = n()) %>% 
-  group_by(Behavior) %>% 
-  mutate(following_prop = num_count / sum(num_count),
-         n_total = sum(num_count)) %>% 
-  mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
-         next_behavior = reorder(next_behavior, num_count, max))
+mother_interactions <- data_duration %>% process_interactions("Mom", "bottle_state")
+  # filter(dyad_unit == "Mom") %>% 
+  # group_by(Behavior, next_behavior, bottle_state) %>% 
+  # summarise(num_count = n()) %>% 
+  # group_by(Behavior, bottle_state) %>% 
+  # mutate(following_prop = num_count / sum(num_count),
+  #        n_total = sum(num_count)) %>% 
+  # mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
+  #        next_behavior = reorder(next_behavior, num_count, max))
 
 responses <- behavior_codebook %>% filter(dyad_unit == "Baby") %>% pull(Behavior)
 
 mother_interactions %>% 
-  heat_plot(responses, "First responses to mother behaviors") %>% 
+  filter(bottle_state == "Bottle in mouth") %>% 
+  heat_plot(responses, "First responses to mother behaviors - Bottle in mouth") %>% 
   ggplotly(tooltip = "text")
 
 mother_interactions %>% 
-  heat_table(responses) %>% 
+  filter(bottle_state == "Bottle not in mouth") %>% 
+  heat_plot(responses, "First responses to mother behaviors - Bottle in mouth") %>% 
+  ggplotly(tooltip = "text")
+
+mother_interactions %>% 
+  filter(bottle_state == "Bottle offered") %>% 
+  heat_plot(responses, "First responses to mother behaviors - Bottle in mouth") %>% 
+  ggplotly(tooltip = "text")
+
+mother_interactions %>% 
+  heat_table(responses, "bottle_state") %>% 
   kable()
 ```
 
 ```{r}
-mother_interactions <- data_duration %>% 
-  filter(dyad_unit == "Mom") %>% 
-  filter(Time_Relative_sf > 0) %>% #Starting conditions don't really count
-  filter(!is.na(next_behavior)) %>%
+infant_interactions <- data_duration %>% 
   mutate(next_behavior = get_group(next_behavior, "narrow")) %>% 
-  group_by(Behavior, next_behavior) %>% 
-  summarise(num_count = n()) %>% 
-  group_by(Behavior) %>% 
-  mutate(following_prop = num_count / sum(num_count),
-         n_total = sum(num_count)) %>% 
-  mutate(Behavior = reorder(Behavior, num_count, max), #These reorderings don't work as intended yet
-         next_behavior = reorder(next_behavior, num_count, max))
+  process_interactions("Mom", "dyad_set")
 
-mother_interactions %>% 
-  heat_plot(behavior_codebook %>% 
-  filter(dyad_unit == "Baby") %>% pull(Narrow_group), "First responses to mother behaviors") %>% 
-  ggplotly(tooltip = "text")
+
+responses <- behavior_codebook %>% filter(dyad_unit == "Baby") %>% pull(Narrow_group)
+
+p <- infant_interactions %>% 
+  heat_plot(responses, "First responses to mother behaviors (by category)") + facet_grid(cols = vars(dyad_set))
+p %>% ggplotly(tooltip = "text")
+
+infant_interactions %>% 
+  heat_table(responses, "dyad_set") %>% 
+  kable()
 ```
 
 ### How long after each behavior is the response?
