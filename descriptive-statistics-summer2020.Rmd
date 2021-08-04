@@ -1645,7 +1645,7 @@ geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
 
 
 Still need to investigate clusters...
-
+# New items
 
 ## 6.	Other considerations for how to describe/classify/cluster mom behaviors:
 
@@ -1669,42 +1669,48 @@ Not sure what exactly this is asking.
 
 ```{r}
 data_duration %>% 
-  filter(Behavior=="Assesses bottle contents") %>% 
-  group_by(id, dyad_set) %>% 
-  summarise(bottles_offered=n()) %>% 
-  ggplot(aes(x=bottles_offered)) +
-  geom_histogram(aes(y=..density..)) +
-  facet_grid(rows=vars(dyad_set)) +
-  ggtitle("Distribution of times that bottle contents are assessed")
-
-data_time_event %>% 
-  arrange(dyad_set, id, -time) %>% 
+  mutate(offer = if_else(Behavior == "Bottle offered", 1, 0)) %>% 
   group_by(dyad_set, id) %>% 
-  mutate()
+  arrange(-Time_Relative_sf) %>% 
+  mutate(bottles_offered = cumsum(offer)) %>% 
+  ungroup() %>% 
+  filter(Behavior == "Assesses bottle contents") %>% 
+  group_by(dyad_set, bottles_offered) %>% 
+  summarise(n = n()) %>% 
+  group_by(dyad_set) %>% 
+  mutate(prop = n / sum(n),) %>% 
+  ggplot(aes(x = bottles_offered, y = prop)) +
+  geom_histogram(stat = "identity") + 
+  facet_grid(rows = vars(dyad_set)) +
+  xlab("Bottles offered after an assessment")
 ```
 
-ii.	How many times does the mom offer after an assess?
+### ii.	How many times does the mom offer after an assess?
 
-
+How is this question different from the last?
 
 iii.	How many times is assess followed by stimulation?
 
 ```{r}
-csp <- behavior_codebook %>% 
-  filter(Narrow_group == "Controlling Stimulating Feeding Practices") %>% 
-  pull(Behavior)
-
-data_time_event %>% 
-  arrange(id, dyad_set, -time) %>% 
-  group_by(id, dyad_set, Bottle_state_counter) %>% 
-  mutate(after_assessment = min(1,cumsum(Assesses.bottle.contents))) %>% 
-  filter(after_assessment == 1) %>% 
-  filter(num_cues_at_time > 0) %>% 
-  mutate(stimulation = min(1, sum(Verbal.stimulation.of.sucking.or.feeding, Physical.stimulation.of.sucking.or.feeding, Pushes.bottle.into.infant.s.mouth))) %>% 
-  filter(stimulation==0)
+data_duration %>% 
+  filter(dyad_unit == "Mom") %>% 
+  group_by(id, dyad_set) %>% 
+  mutate(next_mom_behavior = lead(Behavior),
+         next_mom_b_narrow = lead(Narrow_group)) %>%  
+  filter(Behavior == "Assesses bottle contents") %>% 
+  group_by(dyad_set, next_mom_b_narrow) %>% 
+  summarise(n = n()) %>% 
+  filter(!is.na(next_mom_b_narrow)) %>% 
+  group_by(dyad_set) %>% 
+  mutate(prop = n / sum(n),
+         next_mom_b_narrow = as.factor(next_mom_b_narrow)) %>% 
+  ggplot(aes(x = dyad_set, y = prop, col = next_mom_b_narrow)) +
+  geom_line(aes(linetype = next_mom_b_narrow, group = next_mom_b_narrow)) +
+  geom_point() +
+  ggtitle("Proportion of Bottle Assessments followed by each type of behavior")
 ```
 
-
+Less than 10% of assessments are followed by stimulation (controlling-encouragement) until 6 months where it is slightly over 10%, still a low proportion.
 
 ## 7.	What is the pattern of behaviors that proceeds Indicates feeding is over?
 
