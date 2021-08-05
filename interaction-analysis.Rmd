@@ -52,9 +52,13 @@ p %>%  ggplotly(tooltip = "text")
 process_interactions <- function(data_duration, dyad_unit_response, facet){
   data_duration %>% 
     filter(dyad_unit == dyad_unit_response) %>%
+    filter(!is.na(next_behavior)) %>% 
     filter(Time_Relative_sf > 0) %>% #Starting conditions don't really count
     group_by(across(all_of(c("Behavior", "next_behavior", facet)))) %>% 
-    summarise(num_count = n()) %>%
+    summarise(num_count = n(),
+            q1_time = quantile(time_until_next, 0.25),
+            med_time = median(time_until_next),
+            q3_time = quantile(time_until_next, 0.75)) %>%
     group_by(across(all_of(c("Behavior", facet)))) %>% 
     mutate(following_prop = num_count / sum(num_count),
            n_total = sum(num_count)) %>%
@@ -70,6 +74,10 @@ heat_plot <- function(interactions, used_next, title){
                text = paste("Behavior: ", Behavior,
                             "\nResponse: ", next_behavior,
                             "\nProp. following: ", round(following_prop, 2), " (", num_count, "/", n_total, ")",
+                            "\nTime between behavior and response ---",
+                            "\nq1 time: ", q1_time,
+                            "\nMedian Time: ", as.character(med_time),
+                            "\nq3 time: ", q3_time,
                             sep=""))) +
     geom_point(shape = "square", size = 2) + #bootleg heatmap
     coord_equal() +
@@ -103,12 +111,12 @@ infant_interactions %>%
 
 infant_interactions %>% 
   filter(bottle_state == "Bottle not in mouth") %>% 
-  heat_plot(responses, "First responses to infant behaviors - Bottle in mouth") %>% 
+  heat_plot(responses, "First responses to infant behaviors - Bottle not in mouth") %>% 
   ggplotly(tooltip = "text")
 
 infant_interactions %>% 
   filter(bottle_state == "Bottle offered") %>% 
-  heat_plot(responses, "First responses to infant behaviors - Bottle in mouth") %>% 
+  heat_plot(responses, "First responses to infant behaviors - Bottle offered") %>% 
   ggplotly(tooltip = "text")
 
 
@@ -159,12 +167,12 @@ mother_interactions %>%
 
 mother_interactions %>% 
   filter(bottle_state == "Bottle not in mouth") %>% 
-  heat_plot(responses, "First responses to mother behaviors - Bottle in mouth") %>% 
+  heat_plot(responses, "First responses to mother behaviors - Bottle not in mouth") %>% 
   ggplotly(tooltip = "text")
 
 mother_interactions %>% 
   filter(bottle_state == "Bottle offered") %>% 
-  heat_plot(responses, "First responses to mother behaviors - Bottle in mouth") %>% 
+  heat_plot(responses, "First responses to mother behaviors - Bottle offered") %>% 
   ggplotly(tooltip = "text")
 
 mother_interactions %>% 
@@ -197,6 +205,9 @@ data_duration$time_until_next %>%
 
 time_interactions <- data_duration %>% 
   filter(!is.na(next_behavior)) %>% 
+  mutate(Behavior = Narrow_group,
+       #next_behavior = get_group(next_behavior, "Narrow")
+       ) %>% 
   group_by(Behavior, next_behavior, dyad_unit, dyad_set) %>% 
   summarise(num_count = n(),
             q1_time = quantile(time_until_next, 0.25),
@@ -220,7 +231,7 @@ p <- time_interactions %>%
   scale_color_continuous(type = "viridis") +
   theme(axis.text.x = element_text(angle = 90, hjust= 1)) +
   coord_equal() +
-#  facet_grid(cols = vars(dyad_set)) +
+  facet_grid(cols = vars(dyad_set)) +
   ylab("Original behavior") +
   xlab("Response to behavior") +
   ggtitle("Baby cue response times")
@@ -244,12 +255,12 @@ p <- time_interactions %>%
   scale_color_continuous(type = "viridis") +
   theme(axis.text.x = element_text(angle = 90, hjust= 1)) +
   coord_equal() +
+  facet_grid(cols = vars(dyad_set)) +
   ylab("Original behavior") +
   xlab("Response to behavior") +
   ggtitle("Mom behavior response times")
 
 p %>% ggplotly(tooltip = "text")
-
 ```
 
 Other than a few outliers, this mainly shows that most behaviors have similarly quick response times. Further analysis could reveal more significant differences.
