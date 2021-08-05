@@ -1707,7 +1707,9 @@ data_duration %>%
   ggplot(aes(x = dyad_set, y = prop, col = next_mom_b_narrow)) +
   geom_line(aes(linetype = next_mom_b_narrow, group = next_mom_b_narrow)) +
   geom_point() +
-  ggtitle("Proportion of Bottle Assessments followed by each type of behavior")
+  ggtitle("Proportion of Bottle Assessments followed by each type of behavior") +
+  scale_color_discrete(name = "Mom behavior group") +
+  scale_linetype_discrete(name = "Mom behavior group")
 ```
 
 Less than 10% of assessments are followed by stimulation (controlling-encouragement) until 6 months where it is slightly over 10%, still a low proportion.
