@@ -50,18 +50,33 @@ p %>%  ggplotly(tooltip = "text")
 
 ```{r heat_plot_function}
 process_interactions <- function(data_duration, dyad_unit_response, facet){
-  data_duration %>% 
+  
+  data_processed <- data_duration %>% 
     filter(dyad_unit == dyad_unit_response) %>%
     filter(!is.na(next_behavior)) %>% 
     filter(Time_Relative_sf > 0) %>% #Starting conditions don't really count
-    group_by(across(all_of(c("Behavior", "next_behavior", facet)))) %>% 
+    group_by(Behavior, next_behavior, !!as.name(facet)) %>% 
+    #group_by(across(all_of(c("Behavior", "next_behavior", facet)))) %>% 
     summarise(num_count = n(),
             q1_time = quantile(time_until_next, 0.25),
             med_time = median(time_until_next),
-            q3_time = quantile(time_until_next, 0.75)) %>%
-    group_by(across(all_of(c("Behavior", facet)))) %>% 
+            q3_time = quantile(time_until_next, 0.75)) %>% 
+    ungroup()
+  
+  all_combos <- expand.grid(Behavior = data_processed %>% distinct(Behavior) %>% pull(),
+                            next_behavior = data_processed %>% distinct(next_behavior) %>% pull(),
+                            facet_place = data_processed %>% distinct(!!as.name(facet)) %>% pull())
+  
+  names(all_combos)[names(all_combos) == "facet_place"] <- facet
+  
+  data_processed %>%
+    right_join(all_combos, on = c(Behavior, next_behavior, !!as.name(facet))) %>% 
+    group_by(Behavior, !!as.name(facet)) %>% 
+    mutate(across(c(num_count, q1_time, med_time, q3_time), .fns = ~replace_na(.,0))) %>% 
+    #group_by(across(all_of(c("Behavior", facet)))) %>% 
     mutate(following_prop = num_count / sum(num_count),
            n_total = sum(num_count)) %>%
+    mutate(following_prop = replace_na(following_prop, 0)) %>% 
     return()
 }
 
@@ -75,9 +90,9 @@ heat_plot <- function(interactions, used_next, title){
                             "\nResponse: ", next_behavior,
                             "\nProp. following: ", round(following_prop, 2), " (", num_count, "/", n_total, ")",
                             "\nTime between behavior and response ---",
-                            "\nq1 time: ", q1_time,
-                            "\nMedian Time: ", as.character(med_time),
-                            "\nq3 time: ", q3_time,
+                            "\nq1 time: ", round(q1_time, 2),
+                            "\nMedian Time: ", round(med_time, 2),
+                            "\nq3 time: ", round(q3_time, 2),
                             sep=""))) +
     geom_point(shape = "square", size = 2) + #bootleg heatmap
     coord_equal() +
@@ -103,6 +118,10 @@ heat_table <- function(interactions, used_next, facet){
 infant_interactions <- data_duration %>% process_interactions("Baby", "bottle_state")
 
 responses = behavior_codebook %>% filter(dyad_unit == "Mom") %>% pull(Behavior)
+
+infant_interactions$Behavior %>% length()
+infant_interactions$next_behavior %>% length()
+infant_interactions$bottle_state %>% length()
 
 infant_interactions %>% 
   filter(bottle_state == "Bottle in mouth") %>% 
