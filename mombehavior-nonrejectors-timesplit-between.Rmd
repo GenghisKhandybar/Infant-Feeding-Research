@@ -1,0 +1,1128 @@
+---
+title: 'Mom Behaviors - Across Ages - Feeding Split into Quarters - Non-rejectors only'
+author: ""
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+---
+
+
+This analysis excludes bottle rejectors.
+
+```{r setup, include=FALSE}
+include_rejectors <- c(0)
+source("shared_setup.R")
+```
+
+
+<!-- ```{r, include = FALSE} -->
+
+<!-- library(readr) -->
+<!-- library(dplyr) -->
+<!-- library(tidyr) # need devtools version ? -->
+<!-- library(tibble) -->
+<!-- library(ggplot2) -->
+
+<!-- library(stringr) -->
+<!-- library(purrr) -->
+<!-- library(forcats) -->
+<!-- library(knitr) -->
+<!-- library(purrr) -->
+<!-- library(ggpubr) -->
+<!-- library(cowplot) -->
+<!-- library(gridExtra) -->
+
+
+<!-- library(gganimate) -->
+<!-- # devtools::install_github('haleyjeppson/ggmosaic') -->
+<!-- library(ggmosaic) -->
+
+
+<!-- knitr::opts_chunk$set(echo = FALSE, -->
+<!--                       message = FALSE, -->
+<!--                       warning = FALSE) -->
+
+<!-- # Vectorized sequence function -->
+<!-- # seq_vec(x, y) = c(x[1]:y[1], x[2]:y[2], ...) -->
+<!-- seq_vec <- Vectorize(seq.default, vectorize.args = c("from", "to")) -->
+
+<!-- ratio_lines = seq(1, 4, 0.5) -->
+
+<!-- ``` -->
+
+
+<!-- ```{r, include = FALSE} -->
+
+<!-- # Reorder dyad_set: 2wk, 2mo, 4mo, 6mo -->
+<!-- dyad_set_levels <- c("2wkB", "2moB", "4moB", "6moB") -->
+
+<!-- n_time_points = length(dyad_set_levels) -->
+
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- theme_set(theme_minimal()) -->
+<!-- ``` -->
+
+
+```{r, include = FALSE}
+
+# Load data and select non-rejectors c(0), rejectors c(1), or all c(0, 1)
+
+include_rejectors <- c(0)
+
+data_dyad_total_time_split_zeros <- read_csv("data-dyad-total-time-split-zeros.csv") %>%
+  mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels),
+         id = factor(id),
+         time_split = factor(time_split),
+         Bottle_Rejector = factor(Bottle_Rejector),
+         num_per_min = num_per_length * 60) %>%
+  filter(Bottle_Rejector %in% include_rejectors)
+# %>% filter(time_split == 4)
+
+data_map <- read_csv("data-map.csv") %>%
+  mutate(id = factor(id))
+
+if(1 %in% include_rejectors) {
+  data_map <- data_map %>%
+    mutate(time_points = Time_points_with_rejectors)
+} else {
+  data_map <- data_map %>%
+    mutate(time_points = Time_points)
+}
+
+```
+
+
+<!-- ```{r, include = FALSE} -->
+
+<!-- behaviors <- data_dyad_total_zeros %>% -->
+<!--   select(Behavior) %>% -->
+<!--   unique() %>% -->
+<!--   pull() -->
+
+<!-- state_behaviors <- data_dyad_total_zeros %>% -->
+<!--   filter(Event_Type == "State start") %>% -->
+<!--   select(Behavior) %>% -->
+<!--   unique() %>% -->
+<!--   pull() -->
+
+<!-- point_behaviors <- data_dyad_total_zeros %>% -->
+<!--   filter(Event_Type == "State point") %>% -->
+<!--   select(Behavior) %>% -->
+<!--   unique() %>% -->
+<!--   pull() -->
+
+<!-- cues <- data_dyad_total_zeros %>% -->
+<!--   filter(Grouped_behavior == "Infant Satiation Cues") %>% -->
+<!--   select(Behavior) %>% -->
+<!--   unique() %>% -->
+<!--   pull() -->
+
+<!-- mom_behaviors <- data_dyad_total_zeros %>% -->
+<!--   filter(dyad_unit == "Mom") %>% -->
+<!--   select(Behavior) %>% -->
+<!--   unique() %>% -->
+<!--   pull() -->
+
+<!-- bottle_states <- state_behaviors[grep("Bottle", state_behaviors)] -->
+
+<!-- ``` -->
+
+# Total number of cues
+
+```{r}
+# total number of cues and types of cues
+
+data_dyad_total_cues <- data_dyad_total_time_split_zeros %>%
+  filter(dyad_unit == "Baby") %>%
+  # filter(!(Behavior %in% c("Eyes Open", "Not Crying"))) %>%
+  group_by(dyad_set, id, time_split) %>%
+  summarize(Bottle_Rejector = first(Bottle_Rejector),
+            num_cues = sum(num_occurrences),
+            num_types = n_distinct(Behavior[num_occurrences > 0]),
+            num_cues_per_length = sum(num_per_length),
+            num_cues_per_min = num_cues_per_length * 60,
+            video_length = max(video_length)) %>%
+  mutate(num_types_per_length = num_types / video_length,
+         num_types_per_min = num_types_per_length * 60)
+
+```
+
+## Split by quarter
+
+```{r}
+ggplot(data_dyad_total_cues,
+       aes(x = num_cues, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  xlab("Total number of mom behaviors in quarter") +
+  labs(fill = "age", color = "age") +
+  facet_wrap(vars(time_split))
+  
+ggplot(data_dyad_total_cues,
+       aes(x = dyad_set, y = num_cues, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(shape = 1, alpha = 0.8) +
+  # geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Total number of mom behaviors in quarter") +
+  labs(x = "age", color = "age") +
+  facet_wrap(vars(time_split))
+                 
+```
+
+
+
+```{r}
+
+data_dyad_total_cues %>% 
+  group_by(dyad_set, time_split) %>%
+  summarize_at(vars(num_cues),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+## Comparison of quarters at each age
+
+```{r}
+ggplot(data_dyad_total_cues,
+       aes(x = num_cues, color = time_split, fill = time_split)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  xlab("Total number of mom behaviors in quarter") +
+  labs(fill = "quarter", color = "quarter") +
+  facet_wrap(vars(dyad_set))
+  
+ggplot(data_dyad_total_cues,
+       aes(x = time_split, y = num_cues, col = time_split)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(shape = 1, alpha = 0.8) +
+  # geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Total number of mom behaviors in quarter") +
+  labs(x = "quarter", color = "quarter") +
+  facet_wrap(vars(dyad_set))
+                 
+```
+
+
+```{r}
+
+data_dyad_total_cues %>% 
+  group_by(time_split, dyad_set) %>%
+  summarize_at(vars(num_cues),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+
+
+# Mother behaviors per minute in each quarter
+
+## Split by quarter
+
+```{r}
+ggplot(data_dyad_total_cues,
+       aes(x = num_cues_per_min, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  xlab("Total number of mom behaviors per minute in quarter") +
+  labs(fill = "age", color = "age") +
+  facet_wrap(vars(time_split))
+  
+ggplot(data_dyad_total_cues,
+       aes(x = dyad_set, y = num_cues_per_min, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(shape = 1, alpha = 0.8) +
+  # geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Total number of mom behaviors per minute in quarter") +
+  labs(x = "age", color = "age") +
+  facet_wrap(vars(time_split))
+                 
+```
+
+
+```{r}
+
+data_dyad_total_cues %>% 
+  group_by(dyad_set, time_split) %>%
+  summarize_at(vars(num_cues_per_min),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 4)
+
+```
+
+## Comparison of Quarters at each age
+
+```{r}
+ggplot(data_dyad_total_cues,
+       aes(x = num_cues_per_min, color = time_split, fill = time_split)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  xlab("Total number of mom behaviors per minute in quarter") +
+  labs(fill = "quarter", color = "quarter") +
+  facet_wrap(vars(dyad_set))
+  
+ggplot(data_dyad_total_cues,
+       aes(x = time_split, y = num_cues_per_min, col = time_split)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(shape = 1, alpha = 0.8) +
+  # geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Total number of mom behaviors per minute in quarter") +
+  labs(x = "quarter", color = "quarter") +
+  facet_wrap(vars(dyad_set))
+                 
+```
+
+
+
+
+```{r}
+
+data_dyad_total_cues %>% 
+  group_by(time_split, dyad_set) %>%
+  summarize_at(vars(num_cues_per_min),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 4)
+
+```
+
+
+
+
+# Total number of different types of mother behaviors
+
+
+
+## Split by quarter
+
+```{r}
+
+ggplot(data_dyad_total_cues,
+       aes(x = num_types,
+           y = after_stat(density),
+           color = dyad_set)) +
+  geom_freqpoly(binwidth = 1, linetype = "solid") +
+  ylab("Proportion of dyads") +
+  xlab("Number of different types of mom behaviors in quarter") +
+  labs(color = "age") +
+  facet_wrap(vars(time_split))
+
+ggplot(data_dyad_total_cues,
+       aes(x = dyad_set, y = num_types, col = dyad_set)) +
+  coord_flip() +
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(shape = 1, alpha = 0.8) +
+  ylab("Number of different types of mom behaviors in quarter") +
+  labs(x = "age", color = "age") +
+  facet_wrap(vars(time_split))
+
+```
+
+```{r}
+
+data_dyad_total_cues %>% 
+  group_by(dyad_set, time_split) %>%
+  summarize_at(vars(num_types),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+
+## Comparison of quarters at each age
+
+```{r}
+
+ggplot(data_dyad_total_cues,
+       aes(x = num_types,
+           y = after_stat(density),
+           color = time_split)) +
+  geom_freqpoly(binwidth = 1, linetype = "solid") +
+  ylab("Proportion of dyads") +
+  xlab("Number of different types of mom behaviors in quarter") +
+  labs(color = "quarter") +
+  facet_wrap(vars(dyad_set))
+
+ggplot(data_dyad_total_cues,
+       aes(x = time_split, y = num_types, col = time_split)) +
+  coord_flip() +
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(shape = 1, alpha = 0.8) +
+  ylab("Number of different types of mom behaviors in quarter") +
+  labs(x = "quarter", color = "quarter") +
+  facet_wrap(vars(dyad_set))
+
+
+```
+
+
+
+```{r}
+
+data_dyad_total_cues %>% 
+  group_by(time_split, dyad_set) %>%
+  summarize_at(vars(num_types),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+
+
+
+
+
+# Types of mom behaviors per minute in quarter
+
+
+
+## Split by quarter
+
+```{r}
+
+ggplot(data_dyad_total_cues,
+       aes(x = num_types_per_min,
+           color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  ylab("Density") +
+  xlab("Number of different types of mom behaviors per minute in quarter") +
+  labs(color = "age", fill = "age") +
+  facet_wrap(vars(time_split))
+
+ggplot(data_dyad_total_cues,
+       aes(x = dyad_set, y = num_types_per_min, col = dyad_set)) +
+  coord_flip() +
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(shape = 1, alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Number of different types of mom behaviors per minute in quarter") +
+  labs(x = "age", color = "age") +
+  facet_wrap(vars(time_split))
+
+```
+
+```{r}
+
+data_dyad_total_cues %>% 
+  group_by(dyad_set, time_split) %>%
+  summarize_at(vars(num_types_per_min),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 3)
+
+```
+
+
+## Comparison of quarters at each age
+
+```{r}
+
+ggplot(data_dyad_total_cues,
+       aes(x = num_types_per_min,
+           color = time_split, fill = time_split)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  ylab("Proportion of dyads") +
+  xlab("Number of different types of mom behaviors per minute in quarter") +
+  labs(color = "quarter", fill = "quarter") +
+  facet_wrap(vars(dyad_set))
+
+ggplot(data_dyad_total_cues,
+       aes(x = time_split, y = num_types_per_min, col = time_split)) +
+  coord_flip() +
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(shape = 1, alpha = 0.8) +
+  ylab("Number of different types of mom behaviors per minute in quarter") +
+  labs(x = "quarter", color = "quarter") +
+  facet_wrap(vars(dyad_set))
+
+
+```
+
+
+
+```{r}
+
+data_dyad_total_cues %>% 
+  group_by(time_split, dyad_set) %>%
+  summarize_at(vars(num_types_per_min),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 3)
+
+```
+
+
+
+# Proportion of mothers that express the behavior at least once during quarter
+
+```{r}
+
+data_proportion_behavior_occurs <-
+  data_dyad_total_time_split_zeros %>%
+  filter(Behavior %in% mom_behaviors) %>%
+  mutate(behavior_occurs = as.factor(num_occurrences > 0)) %>%
+  group_by(dyad_set, time_split, Behavior, behavior_occurs, .drop = FALSE) %>%
+  summarize(count = n()) %>%
+  pivot_wider(names_from = behavior_occurs, values_from = count) %>%
+  mutate(proportion_dyads_with_behavior = `TRUE` / (`TRUE` + `FALSE`))
+
+```
+
+## Split by quarter
+
+```{r}
+
+ggplot(data_proportion_behavior_occurs,
+       aes(y = reorder(Behavior, proportion_dyads_with_behavior, mean),
+           x = proportion_dyads_with_behavior,
+           col = dyad_set)) +
+  geom_jitter(width = 0, height = 0.1) +
+  xlim(0, 1) + 
+  xlab("Proportion of mothers that express the behavior in quarter") +
+  ylab("Maternal behavior") +
+  labs(col = "age") +
+  ggtitle("Proportion of mothers that express behavior\n at least once during quarter") +
+  facet_wrap(vars(time_split))
+
+```
+
+## Comparison of quarters at each age
+
+```{r}
+
+ggplot(data_proportion_behavior_occurs,
+       aes(y = reorder(Behavior, proportion_dyads_with_behavior, mean),
+           x = proportion_dyads_with_behavior,
+           col = time_split)) +
+  geom_jitter(width = 0, height = 0.1) +
+  xlim(0, 1) + 
+  xlab("Proportion of mothers that express the behavior in quarter") +
+  ylab("Maternal behavior") +
+  labs(col = "quarter") +
+  ggtitle("Proportion of mothers that express behavior\n at least once during quarter") +
+  facet_wrap(vars(dyad_set))
+
+```
+
+
+
+
+
+# Individual mother behaviors: number of occurrences per minute in quarter
+
+Only includes dyads who express the behavior at least once in quarter
+
+## Split by quarter
+
+```{r}
+
+for (selected_cue in sort(mom_behaviors)) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_time_split_zeros %>%
+    filter(Behavior == selected_cue)  %>%
+    filter(num_occurrences > 0)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_min,
+                   y = after_stat(density),
+                   color = dyad_set,
+                   fill = dyad_set)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Occurrences of behavior per minute in quarter") +
+    labs(color = "age", fill = "age") +
+    ggtitle(selected_cue) +
+    facet_wrap(vars(time_split), ncol = 2, drop = FALSE)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_min,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Occurrences of behavior per minute in quarter") +
+    labs(color = "age") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(time_split), ncol = 2, drop = FALSE)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = dyad_set, y = num_per_min, col = dyad_set)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(shape = 1, alpha = 0.8) +
+    ylab("Occurrences of behavior per minute in quarter") +
+    labs(x = "age", col = "age") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(time_split), ncol = 2, drop = FALSE)
+
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(dyad_set, time_split) %>%
+    summarize_at(vars(num_per_min),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+
+
+
+
+## Comparison of Quarters at each age
+
+
+```{r}
+
+for (selected_cue in sort(mom_behaviors)) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_time_split_zeros %>%
+    filter(Behavior == selected_cue)  %>%
+    filter(num_occurrences > 0)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_min,
+                   y = after_stat(density),
+                   color = time_split,
+                   fill = time_split)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Occurrences of behavior per minute in quarter") +
+    labs(color = "quarter", fill = "quarter") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(dyad_set), ncol = 2, drop = FALSE)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_min,
+                   color = time_split)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Occurrences of behavior per minute in quarter") +
+    labs(color = "quarter") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(dyad_set), ncol = 2, drop = FALSE)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = time_split, y = num_per_min, col = time_split)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(shape = 1, alpha = 0.8) +
+    ylab("Occurrences of behavior per minute in quarter") +
+    labs(x = "quarter", col = "quarter") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(dyad_set), ncol = 2, drop = FALSE)
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(time_split, dyad_set) %>%
+    summarize_at(vars(num_per_min),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+
+
+
+
+
+# Number of bottle states by quarter
+
+
+## Split by quarter
+
+```{r}
+
+for (selected_cue in sort(bottle_states)) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_time_split_zeros %>%
+    filter(Behavior == selected_cue)  %>%
+    filter(num_occurrences > 0)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_occurrences,
+                   y = after_stat(density),
+                   color = dyad_set,
+                   fill = dyad_set)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Occurrences of bottle state in quarter") +
+    labs(color = "age", fill = "age") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(time_split), ncol = 2, drop = FALSE)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_occurrences,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Occurrences of bottle state in quarter") +
+    labs(color = "age") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(time_split), ncol = 2, drop = FALSE)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = dyad_set, y = num_occurrences, col = dyad_set)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(shape = 1, alpha = 0.8) +
+    ylab("Occurrences of bottle states in quarter") +
+    labs(x = "age", col = "age") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(time_split), ncol = 2, drop = FALSE)
+
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(dyad_set, time_split) %>%
+    summarize_at(vars(num_occurrences),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+
+
+
+
+## Comparison of Quarters at each age
+
+
+```{r}
+
+for (selected_cue in sort(bottle_states)) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_time_split_zeros %>%
+    filter(Behavior == selected_cue)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_occurrences,
+                   y = after_stat(density),
+                   color = time_split,
+                   fill = time_split)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Occurrences of bottle state in quarter") +
+    labs(color = "quarter", fill = "quarter") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(dyad_set), ncol = 2, drop = FALSE)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_occurrences,
+                   color = time_split)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Occurrences of bottle state in quarter") +
+    labs(color = "quarter") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(dyad_set), ncol = 2, drop = FALSE)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = time_split, y = num_occurrences, col = time_split)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(shape = 1, alpha = 0.8) +
+    ylab("Occurrences of bottle state in quarter") +
+    labs(x = "quarter", col = "quarter") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(dyad_set), ncol = 2, drop = FALSE)
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(time_split, dyad_set) %>%
+    summarize_at(vars(num_occurrences),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+
+
+
+
+# Number of bottle states per minute in quarter
+
+
+## Split by quarter
+
+```{r}
+
+for (selected_cue in sort(bottle_states)) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_time_split_zeros %>%
+    filter(Behavior == selected_cue)  %>%
+    filter(num_occurrences > 0)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_min,
+                   y = after_stat(density),
+                   color = dyad_set,
+                   fill = dyad_set)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Occurrences of bottle state per minute in quarter") +
+    labs(color = "age", fill = "age") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(time_split), ncol = 2, drop = FALSE)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_min,
+                   color = dyad_set)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Occurrences of bottle state per minute in quarter") +
+    labs(color = "age") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(time_split), ncol = 2, drop = FALSE)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = dyad_set, y = num_per_min, col = dyad_set)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(shape = 1, alpha = 0.8) +
+    ylab("Occurrences of bottle states per minute in quarter") +
+    labs(x = "age", col = "age") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(time_split), ncol = 2, drop = FALSE)
+
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(dyad_set, time_split) %>%
+    summarize_at(vars(num_per_min),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+
+
+
+
+## Comparison of Quarters at each age
+
+
+```{r}
+
+for (selected_cue in sort(bottle_states)) {
+  
+  data_dyad_total_zeros_selected_cue <-
+    data_dyad_total_time_split_zeros %>%
+    filter(Behavior == selected_cue)
+  
+  p1 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_min,
+                   y = after_stat(density),
+                   color = time_split,
+                   fill = time_split)) +
+    geom_histogram(aes(y = ..density..), alpha = 0.3, position = "identity") +
+    ylab("Density") +
+    xlim(0, NA) + 
+    xlab("Occurrences of bottle state per minute in quarter") +
+    labs(color = "quarter", fill = "quarter") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(dyad_set), ncol = 2, drop = FALSE)
+  
+  p2 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = num_per_min,
+                   color = time_split)) +
+    stat_ecdf(geom = "step") +
+    ylab("Cumulative proportion of dyads") +
+    xlab("Occurrences of bottle state per minute in quarter") +
+    labs(color = "quarter") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(dyad_set), ncol = 2, drop = FALSE)
+  
+  p3 <- ggplot(data_dyad_total_zeros_selected_cue,
+               aes(x = time_split, y = num_per_min, col = time_split)) +
+    coord_flip() +
+    geom_violin() + 
+    geom_boxplot(width = 0.1) + 
+    geom_jitter(shape = 1, alpha = 0.8) +
+    ylab("Occurrences of bottle state per minute in quarter") +
+    labs(x = "quarter", col = "quarter") +
+    ggtitle(selected_cue) +
+
+    facet_wrap(vars(dyad_set), ncol = 2, drop = FALSE)
+  
+  
+  grid.arrange(p1, p3, ncol = 2)
+  
+  t <- data_dyad_total_zeros_selected_cue %>% 
+    group_by(time_split, dyad_set) %>%
+    summarize_at(vars(num_per_min),
+                 list(size = ~length(.),
+                      ~mean(.),
+                      ~sd(.),
+                      ~min(.),
+                      Q1 = ~quantile(., 0.25),
+                      ~median(.), Q3 = ~quantile(., 0.75),
+                      ~max(.)))
+  print(kable(t, digits = 4))
+  cat('\n')
+  
+}
+
+```
+
+
+```{r}
+knitr::knit_exit()
+```
+
+# END
+
+
+# Total number of bottle states in feeding
+
+```{r}
+
+data_dyad_total_bottle_state <- data_dyad_total_time_split_zeros %>%
+  filter(Behavior %in% bottle_states)
+
+plot_bottle_in_mouth_pdf <- ggplot(data_dyad_total_bottle_state,
+       aes(x = num_occurrences,
+           y = after_stat(density),
+           colour = dyad_set)) +
+  geom_freqpoly(binwidth = 1, linetype = "solid") +
+  ylab("Proportion of dyads") +
+  xlab("Total number of bouts in feeding") +
+  ggtitle("Bottle states") +
+  facet_wrap(~Behavior) +
+  
+
+
+plot_bottle_in_mouth_cdf <- ggplot(data_dyad_total_bottle_state,
+       aes(num_occurrences,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of dyads") +
+  xlab("Total number of bouts in feeding") +
+  facet_wrap(~Behavior) +
+  
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+```{r}
+
+ggplot(data_dyad_total_bottle_state,
+       aes(x = dyad_set, y = num_occurrences, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Total number of bouts in feeding") +
+  facet_wrap(~Behavior) +
+  
+                 
+```
+
+
+```{r}
+
+data_dyad_total_bottle_state %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize_at(vars(num_occurrences),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+## Number of bottle states per feeding length
+
+
+
+```{r}
+n_time_splits = 4
+
+for (q in 1:n_time_splits) {
+p1 <- ggplot(data_dyad_total_bottle_state,
+       aes(x = num_per_length, color = dyad_set, fill = dyad_set)) +
+  geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity") +
+  xlab("Number of bouts per length of feeding") +
+  facet_wrap(~Behavior) +
+  ggtitle(paste("Quarter = ", q))
+print(p1)
+
+p2<- ggplot(data_dyad_total_bottle_state,
+       aes(x = dyad_set, y = num_per_length, col = dyad_set)) +
+  coord_flip() +
+  geom_violin() + 
+  geom_boxplot(width = 0.1) + 
+  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
+  scale_shape_manual(values = c(1, 4)) +
+  ylab("Number of bouts per length of feeding") +
+  facet_wrap(~Behavior) +
+  ggtitle(paste("Quarter = ", q))
+print(p2)
+
+t1 <- data_dyad_total_bottle_state %>%
+  group_by(dyad_set, Behavior, time_split) %>%
+  filter(time_split == q) %>%
+  summarize_at(vars(num_per_length),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 4)
+print(t1)
+}
+
+```
+

@@ -291,7 +291,7 @@ data_dyad_total <- data_duration %>%
             Event_Type = first(Event_Type),
             dyad_unit = first(dyad_unit),
             Grouped_behavior = first(Grouped_behavior),
-            total_fraction = sum(duration_fraction), 
+            total_fraction = sum(duration_fraction),
             total_duration = sum(duration),
             num_occurrences = n(),
             video_length = max(video_length)) %>%
@@ -498,4 +498,131 @@ data_time_event <- data_time_event %>%
 write.csv(data_time_event,
           "data_time_event.csv",
           row.names = FALSE)
+```
+
+# duration-data-time-split
+
+```{r duration-data-time-split}
+# individual instances of each behavior
+# For each behavior, compute start time, end time, and duration
+# as fraction of feeding length
+
+get_time_split <- function(x, q) {
+  ifelse(x == 1, q, 1 + trunc((x * q) %% q))
+}
+
+n_time_splits <- 4 # 4 for quarters; 3 for thirds; etc
+
+data_duration_time_split <- data %>%
+  mutate(end_time = time + duration) %>%
+  group_by(dyad_set, id) %>%
+  mutate(duration_fraction = duration / max(end_time),
+         start_fraction = time / max(end_time),
+         end_fraction = end_time / max(end_time),
+         video_length = max(end_time)) %>%
+  filter(Event_Type %in% c("State start", "State point")) %>%
+  mutate(time_split = get_time_split(start_fraction, n_time_splits),
+         split_length = video_length / n_time_splits)
+
+
+```
+
+
+For each dyad, count number of instances and total time of each behavior, both absolute and relative to length of video.
+
+```{r dyad-totals}
+# Total count and time of each Behavior per dyad
+
+data_dyad_total <- data_duration %>%
+  group_by(dyad_set, id, Behavior) %>%
+  summarize(Bottle_Rejector = first(Bottle_Rejector),
+            Event_Type = first(Event_Type),
+            dyad_unit = first(dyad_unit),
+            Grouped_behavior = first(Grouped_behavior),
+            total_fraction = sum(duration_fraction), 
+            total_duration = sum(duration),
+            num_occurrences = n(),
+            video_length = max(video_length)) %>%
+  mutate(num_per_length = num_occurrences / video_length)
+
+
+```
+
+```{r dyad-totals-time-split}
+# Total count and time of each Behavior per dyad
+
+data_dyad_total_time_split <- data_duration_time_split %>%
+  group_by(dyad_set, id, Behavior, time_split) %>%
+  summarize(Bottle_Rejector = first(Bottle_Rejector),
+            Event_Type = first(Event_Type),
+            dyad_unit = first(dyad_unit),
+            time_split = first(time_split),
+            Grouped_behavior = first(Grouped_behavior),
+            total_fraction = sum(duration_fraction), 
+            total_duration = sum(duration),
+            num_occurrences = n(),
+            video_length = max(video_length),
+            video_mins = video_length / 60,
+            split_length = max(split_length)) %>%
+  mutate(num_per_length = num_occurrences / video_length,
+         num_per_split = num_occurrences / split_length,
+         num_per_length = num_occurrences / video_length,
+         num_per_min = num_occurrences / video_mins)
+
+
+```
+
+
+
+Add zeros for unobserved behaviors.
+One row for each possible behavior for each dyad at each age.
+
+<!-- Old data_dyad_total_zeros -->
+<!-- ```{r} -->
+
+<!-- data_dyad_total_zeros <- -->
+<!--   left_join(expand_grid(data_ids, Behavior = behaviors), -->
+<!--             data_dyad_total %>% -->
+<!--               select_if(names(.) %in% c("dyad_set", "id", "Behavior") | -->
+<!--                           sapply(., is.numeric)) %>%  -->
+<!--               mutate(id = as.factor(id)), -->
+<!--             by = c("dyad_set", "id", "Behavior")) %>% -->
+<!--   mutate( -->
+<!--     across(where(is.numeric), ~replace_na(.x, 0)) -->
+<!--   ) %>% -->
+<!--   group_by(dyad_set, id) %>% -->
+<!--   mutate(video_length = max(video_length)) -->
+
+<!-- write.csv(data_dyad_total_zeros, -->
+<!--           "data-dyad-total-zeros.csv", -->
+<!--           row.names = FALSE) -->
+
+<!-- ``` -->
+
+
+```{r}
+behaviors <- data %>%
+  select(Behavior) %>%
+  unique() %>% 
+  mutate(Behavior = replace(Behavior, Behavior == "Blocks mouth", "Blocks mouth with hands or feet")) %>% 
+  pull()
+
+data_dyad_total_time_split_zeros <-
+  left_join(expand_grid(data_ids, Behavior = behaviors, time_split = 1:n_time_splits),
+            data_dyad_total_time_split %>%
+              select_if(names(.) %in% c("dyad_set", "id", "Behavior", "time_split", "dyad_unit") |
+                          sapply(., is.numeric))%>% 
+              mutate(id = as.factor(id)),
+            by = c("dyad_set", "id", "Behavior", "time_split")) %>%
+  mutate(
+    across(where(is.numeric), ~replace_na(.x, 0))
+  ) %>%
+  group_by(dyad_set, id) %>%
+  mutate(video_length = max(video_length),
+         split_length = max(split_length))
+
+write.csv(data_dyad_total_time_split_zeros,
+          "data-dyad-total-time-split-zeros.csv",
+          row.names = FALSE)
+
 ```
