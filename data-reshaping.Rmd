@@ -148,6 +148,11 @@ data_duration <- data %>%
 
 # now including useful interaction variables
 
+bottle_states <- data %>%
+  filter(str_detect(Behavior, "^Bottle")) %>%
+  pull(Behavior) %>%
+  unique()
+
 data_duration <- data_duration %>% 
   group_by(dyad_set, id) %>% #Create bottle_state variable
   mutate(new_bottle_state = if_else(Behavior %in% bottle_states, 1, 0),
@@ -332,11 +337,6 @@ behaviors <- data %>%
 # Vectorized sequence function
 # seq_vec(x, y) = c(x[1]:y[1], x[2]:y[2], ...)
 seq_vec <- Vectorize(seq.default, vectorize.args = c("from", "to"))
-
-bottle_states <- data %>%
-  filter(str_detect(Behavior, "^Bottle")) %>%
-  pull(Behavior) %>%
-  unique()
 
 create_state_path <- function(x) {
   
