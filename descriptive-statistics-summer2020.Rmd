@@ -146,8 +146,7 @@ Reshape data as time/event type
 
 
 
-```{r reshape-data-time-event}
-#source("reshape_data_time_event.R")
+```{r data-time-event}
 data_time_event <- read.csv("data_time_event.csv")
 ```
 
@@ -1682,7 +1681,8 @@ data_duration %>%
   ggplot(aes(x = bottles_offered, y = prop)) +
   geom_histogram(stat = "identity") + 
   facet_grid(rows = vars(dyad_set)) +
-  xlab("Bottles offered after an assessment")
+  xlab("Bottles offered after an assessment") +
+  ylab("Proportion of dyads")
 ```
 
 ### ii.	How many times does the mom offer after an assess?
@@ -1711,6 +1711,8 @@ data_duration %>%
   scale_color_discrete(name = "Mom behavior group") +
   scale_linetype_discrete(name = "Mom behavior group")
 ```
+
+*baseline behaviors for the mother are bottle offered and bottle in mouth. Should these be re-categorized?
 
 Less than 10% of assessments are followed by stimulation (controlling-encouragement) until 6 months where it is slightly over 10%, still a low proportion.
 
