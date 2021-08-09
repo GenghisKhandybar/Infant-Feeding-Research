@@ -146,7 +146,7 @@ data_duration <- data %>%
          video_length = max(end_time)) %>%
   filter(Event_Type %in% c("State start", "State point"))
 
-# now including useful interaction variables
+# now including interaction variables
 
 bottle_states <- data %>%
   filter(str_detect(Behavior, "^Bottle")) %>%
@@ -168,9 +168,13 @@ data_duration <- data_duration %>%
          chain_group = cumsum(switch) - switch) %>% #Switch = 1 at end of group, chain group changes at start of new group
   ungroup() %>% 
   mutate(next_behavior = if_else(switch == 1, lead(Behavior), NULL),
+         next_group_narrow = if_else(switch == 1, lead(Narrow_group), NULL),
+         next_group_wide = if_else(switch == 1, lead(Wide_group), NULL),
          next_time = if_else(switch == 1, lead(Time_Relative_sf), NULL)) %>% 
   group_by(id, dyad_set, chain_group) %>% 
   mutate(next_behavior = if_else(is.na(next_behavior), last(next_behavior), next_behavior),
+         next_group_narrow = if_else(is.na(next_group_narrow), last(next_group_narrow), next_group_narrow),
+         next_group_wide = if_else(is.na(next_group_wide), last(next_group_wide), next_group_wide),
          next_time = if_else(is.na(next_time), last(next_time), next_time),
          time_until_next = next_time - Time_Relative_sf) %>% 
   ungroup() %>% 
