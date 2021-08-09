@@ -227,7 +227,7 @@ time_interactions <- data_duration %>%
   mutate(Behavior = Narrow_group,
        #next_behavior = get_group(next_behavior, "Narrow")
        ) %>% 
-  group_by(Behavior, next_behavior, dyad_unit, dyad_set) %>% 
+  group_by(Narrow_group, next_group_narrow, dyad_unit, dyad_set) %>% 
   summarise(num_count = n(),
             q1_time = quantile(time_until_next, 0.25),
             med_time = median(time_until_next),
@@ -235,11 +235,11 @@ time_interactions <- data_duration %>%
 
 p <- time_interactions %>% 
   filter(dyad_unit == "Baby") %>% 
-  ggplot(aes(y = Behavior,
-             x = next_behavior,
+  ggplot(aes(y = Narrow_group,
+             x = next_group_narrow,
              col = med_time,
-             text = paste("Behavior: ", Behavior,
-                          "\nResponse: ", next_behavior,
+             text = paste("Behavior: ", Narrow_group,
+                          "\nResponse: ", next_group_narrow,
                           "\nn :", num_count,
                           "\nTime between cue and response ---",
                           "\nq1 time: ", q1_time,
@@ -259,11 +259,11 @@ p %>% ggplotly(tooltip = "text")
 
 p <- time_interactions %>% 
   filter(dyad_unit == "Mom") %>% 
-  ggplot(aes(y = Behavior,
-             x = next_behavior,
+  ggplot(aes(y = Narrow_group,
+             x = next_group_narrow,
              col = med_time,
-             text = paste("Behavior: ", Behavior,
-                          "\nResponse: ", next_behavior,
+             text = paste("Behavior: ", Narrow_group,
+                          "\nResponse: ", next_group_narrow,
                           "\nn :", num_count,
                           "\nTime between cue and response ---",
                           "\nq1 time: ", q1_time,
