@@ -17,67 +17,6 @@ include_rejectors <- c(0)
 source("shared_setup.R")
 ```
 
-
-<!-- ```{r, include = FALSE} -->
-
-<!-- library(readr) -->
-<!-- library(dplyr) -->
-<!-- library(tidyr) # need devtools version ? -->
-<!-- library(tibble) -->
-<!-- library(ggplot2) -->
-
-<!-- library(stringr) -->
-<!-- library(purrr) -->
-<!-- library(forcats) -->
-<!-- library(knitr) -->
-<!-- library(purrr) -->
-<!-- library(ggpubr) -->
-<!-- library(cowplot) -->
-<!-- library(gridExtra) -->
-
-
-<!-- library(gganimate) -->
-<!-- # devtools::install_github('haleyjeppson/ggmosaic') -->
-<!-- library(ggmosaic) -->
-
-
-<!-- knitr::opts_chunk$set(echo = FALSE, -->
-<!--                       message = FALSE, -->
-<!--                       warning = FALSE) -->
-
-<!-- # Vectorized sequence function -->
-<!-- # seq_vec(x, y) = c(x[1]:y[1], x[2]:y[2], ...) -->
-<!-- seq_vec <- Vectorize(seq.default, vectorize.args = c("from", "to")) -->
-
-<!-- ratio_lines = seq(1, 4, 0.5) -->
-
-<!-- ``` -->
-
-
-<!-- ```{r, include = FALSE} -->
-
-<!-- # Reorder dyad_set: 2wk, 2mo, 4mo, 6mo -->
-<!-- dyad_set_levels <- c("2wkB", "2moB", "4moB", "6moB") -->
-
-<!-- n_time_points = length(dyad_set_levels) -->
-
-<!-- ``` -->
-
-
-<!-- ```{r} -->
-<!-- theme_set(theme_minimal()) -->
-
-
-
-<!-- cbPalette  <- c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499",  -->
-<!--                              "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888") -->
-
-<!-- color_theme <- scale_color_manual(values = cbPalette, -->
-<!--                                   aesthetics = c("color", "fill")) -->
-
-<!-- ``` -->
-
-
 ```{r, include = FALSE}
 
 # Load data and select non-rejectors c(0), rejectors c(1), or all c(0, 1)
@@ -105,42 +44,6 @@ if(1 %in% include_rejectors) {
 }
 
 ```
-
-
-<!-- ```{r, include = FALSE} -->
-
-<!-- behaviors <- data_dyad_total_zeros %>% -->
-<!--   select(Behavior) %>% -->
-<!--   unique() %>% -->
-<!--   pull() -->
-
-<!-- state_behaviors <- data_dyad_total_zeros %>% -->
-<!--   filter(Event_Type == "State start") %>% -->
-<!--   select(Behavior) %>% -->
-<!--   unique() %>% -->
-<!--   pull() -->
-
-<!-- point_behaviors <- data_dyad_total_zeros %>% -->
-<!--   filter(Event_Type == "State point") %>% -->
-<!--   select(Behavior) %>% -->
-<!--   unique() %>% -->
-<!--   pull() -->
-
-<!-- cues <- data_dyad_total_zeros %>% -->
-<!--   filter(Grouped_behavior == "Infant Satiation Cues") %>% -->
-<!--   select(Behavior) %>% -->
-<!--   unique() %>% -->
-<!--   pull() -->
-
-<!-- mom_behaviors <- data_dyad_total_zeros %>% -->
-<!--   filter(dyad_unit == "Mom") %>% -->
-<!--   select(Behavior) %>% -->
-<!--   unique() %>% -->
-<!--   pull() -->
-
-<!-- bottle_states <- state_behaviors[grep("Bottle", state_behaviors)] -->
-
-<!-- ``` -->
 
 # Total number of cues
 
