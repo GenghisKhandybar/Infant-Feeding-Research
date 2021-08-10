@@ -177,8 +177,11 @@ data_duration <- data_duration %>%
          next_group_wide = if_else(is.na(next_group_wide), last(next_group_wide), next_group_wide),
          next_time = if_else(is.na(next_time), last(next_time), next_time),
          time_until_next = next_time - Time_Relative_sf) %>% 
+  mutate(one = 1,
+         remaining_cues = cumsum(one),
+         remaining_cues = max(remaining_cues) - remaining_cues) %>% 
   ungroup() %>% 
-  select(-switch, -chain_group)
+  select(-switch, -chain_group, -one)
 
 write.csv(data_duration,
   "data_duration.csv",
