@@ -366,3 +366,51 @@ p <- interaction_data %>%
   facet_grid(cols = vars(dyad_set))
 p  %>% ggplotly(tooltip = "text")
 ```
+
+## Behaviors until a response
+
+### Baby cues
+
+```{r}
+data_duration %>% 
+  filter(dyad_unit == "Baby" & Narrow_group == "Subtle") %>% 
+  ggplot(aes(x = remaining_cues, y = Behavior, col = dyad_set)) +
+  geom_boxplot() +
+  ggtitle("Baby cues before a response")
+
+data_duration %>% 
+  filter(dyad_unit == "Baby" & Narrow_group == "Potent") %>% 
+  ggplot(aes(x = remaining_cues, y = Behavior, col = dyad_set)) +
+  geom_boxplot() +
+  ggtitle("Baby cues before a response")
+
+data_duration %>% 
+  filter(dyad_unit == "Baby") %>% 
+  group_by(Behavior, dyad_set) %>% 
+  summary_5_num("remaining_cues") %>% 
+  arrange(Behavior, dyad_set) %>% 
+  kable()
+```
+
+### Mom behaviors
+
+```{r}
+mom_narrow_groups <- behavior_codebook %>% filter(dyad_unit == "Mom") %>% distinct(Wide_group) %>% pull()
+
+for(t in mom_narrow_groups){
+  p <- data_duration %>% 
+    filter(Wide_group == t) %>% 
+    ggplot(aes(x = remaining_cues, y = Behavior, col = dyad_set)) +
+    geom_boxplot() +
+    ggtitle("Mom behaviors remaining before a response")
+  p %>% print()
+}
+
+data_duration %>% 
+  filter(dyad_unit == "Mom") %>% 
+  group_by(Behavior, dyad_set) %>% 
+  summary_5_num(to_summarise = "remaining_cues") %>% 
+  arrange(Behavior, dyad_set) %>% 
+  kable()
+```
+

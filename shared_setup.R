@@ -161,15 +161,18 @@ ratio_lines = seq(1, 4, 0.5)
 
 # 5 number summary function -----------------
 
-summary_5_num <- function(df_grouped) {
+summary_5_num <- function(df_grouped, to_summarise) {
+  
   df_grouped %>% 
     summarise(
       n = n(),
-      min = min(time_before_end),
-      q1 = quantile(time_before_end, 0.25), 
-      median = median(time_before_end), 
-      q3 = quantile(time_before_end, 0.75), 
-      max=max(time_before_end)
+      min = min(!!as.name(to_summarise)),
+      q1 = quantile(!!as.name(to_summarise), 0.25), 
+      median = median(!!as.name(to_summarise)), 
+      q3 = quantile(!!as.name(to_summarise), 0.75), 
+      max=max(!!as.name(to_summarise)),
+      mean = mean(!!as.name(to_summarise)),
+      std = sd(!!as.name(to_summarise))
     ) %>% 
     arrange(-median) %>% 
     return()

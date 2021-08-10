@@ -109,7 +109,7 @@ Using the final cues found in the previous plot, this plot shows how close to th
 #Table form - time distribution is skewed so median is more useful than mean
 final_cue %>% 
   group_by(Behavior) %>% 
-  summary_5_num() %>% 
+  summary_5_num("time_before_end") %>% 
   kable(digits=2, caption="Final cues: How many seconds each happens before feeding ends")
 ```
 
