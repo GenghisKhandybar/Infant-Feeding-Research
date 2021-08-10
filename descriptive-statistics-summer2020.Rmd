@@ -26,6 +26,10 @@ n_dyads <- data %>%
   summarize(n = n_distinct(id))
 ```
 
+```{r data-time-event}
+data_time_event <- read.csv("data_time_event.csv")
+```
+
 <!-- Find Bottle state at each time: probably an easier/better way to do -->
 
 ```{r}
@@ -143,15 +147,6 @@ Reshape data as time/event type
 
 
 ```
-
-
-
-```{r data-time-event}
-data_time_event <- read.csv("data_time_event.csv")
-```
-
-
-
 
 <!-- # Dyad totals -->
 

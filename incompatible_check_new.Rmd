@@ -8,7 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 include_rejectors <- c(0, 1)
 source("shared_setup.R")
-source("reshape_data_time_event.R")
+source("reshape_data_time_event.R") #This can be commented out, but column names below must be modified.
 ```
 
 ```{r}

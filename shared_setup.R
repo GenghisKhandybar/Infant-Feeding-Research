@@ -68,6 +68,10 @@ data <- read_csv("data.csv") %>%
   mutate(Behavior = replace(Behavior, Behavior == "Blocks mouth", "Blocks mouth with hands or feet")) %>% 
   filter(Bottle_Rejector %in% include_rejectors)
 
+# Reading data_time_event.csv
+
+data_time_event <- read.csv("data_time_event.csv")
+
 # Reading data_dyad_total_zeros ----------------------------------------------------
 
 data_dyad_total_zeros <- read_csv("data-dyad-total-zeros.csv") %>%
