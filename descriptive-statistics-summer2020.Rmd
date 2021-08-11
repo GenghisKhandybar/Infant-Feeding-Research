@@ -268,6 +268,8 @@ bottle_in_mouth_bouts_last_cue <- bottle_bouts_last_cue %>%
 
 
 ```{r}
+# Invididual cues
+
 data_baby_cues <- data %>%
   filter(dyad_unit == "Baby") %>%
   filter(!(Behavior %in% c("Eyes Open", "Not Crying"))) %>%
@@ -288,6 +290,24 @@ plot_baby_cues_by_bottle_state <- ggplot(data_baby_cues_by_bottle_state,
   ylab("Percent of occurrences in bottle state") +
   facet_grid(~ dyad_set)
 
+# Grouped cues
+
+plot_baby_cues_grouped <- data %>%
+  filter(dyad_unit == "Baby") %>%
+  filter(!(Behavior %in% c("Eyes Open", "Not Crying"))) %>%
+  filter(!(Event_Type == "State stop")) %>%
+  filter(!is.na(Bottle_state)) %>%
+  group_by(dyad_set, Narrow_group, Bottle_state) %>%
+  count(name = "count") %>% 
+  ggplot(aes(fill = Bottle_state,
+         y = count,
+         x = Narrow_group)) + 
+  geom_bar(position = "fill", stat = "identity") +
+  coord_flip() +
+  ylab("Percent of occurrences in bottle state") +
+  facet_grid(~ dyad_set)
+
+
 plot_bottle_state <- data %>%
   filter(Event_Type == "State start") %>%
   filter(Behavior %in% bottle_states) %>%
@@ -307,13 +327,12 @@ legend <- get_legend(
 
 plot_grid(
   plot_grid(plot_baby_cues_by_bottle_state + theme(legend.position="none"),
+            plot_baby_cues_grouped  + theme(legend.position="none"),
             plot_bottle_state + theme(legend.position="none"),
-            rel_heights = c(4, 1),
-            ncol = 1, nrow = 2,
+            rel_heights = c(4, 1.5, 1.5),
+            ncol = 1, nrow = 3,
             align = "v"),
   legend, rel_widths = c(5, 1))
-
-
 
 ```
 
