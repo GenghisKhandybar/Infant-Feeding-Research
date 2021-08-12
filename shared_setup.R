@@ -70,7 +70,8 @@ data <- read_csv("data.csv") %>%
 
 # Reading data_time_event.csv
 
-data_time_event <- read.csv("data_time_event.csv")
+data_time_event <- read.csv("data_time_event.csv") %>% 
+  mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels))
 
 # Reading data_dyad_total_zeros ----------------------------------------------------
 
