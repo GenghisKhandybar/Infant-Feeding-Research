@@ -16,6 +16,11 @@ source("shared_setup.R")
 
 # 3. When the state is bottle-offer and infant cues occur (especially Blocks mouth and Lip compression, but others, too):
 
+
+```{r}
+data %>% filter(id == 70174 & dyad_set == "2wkB") %>% select(Time_Relative_sf, Duration_sf, Behavior)
+```
+
 ```{r}
 interaction_data <- data_duration %>% 
   mutate(next_dyad_unit = lead(dyad_unit),
@@ -35,17 +40,31 @@ interaction_data <- data_duration %>%
       next_behavior == "Pushes bottle into infant's mouth" ~ "Controlling",
       next_behavior == "Verbal stimulation of sucking or feeding" ~ "Controlling",
       next_behavior == "Physical stimulation of sucking or feeding" ~ "Controlling",
+      next_behavior == "Assesses bottle contents" ~ "Controlling",
       next_behavior == "Verbal acknowledgement of fullness" ~ "Responsive",
       next_behavior == "Verbal acknowledgement of hunger" ~ "Responsive",
       next_behavior == "Bottle not in mouth" ~ "Responsive",
+      next_behavior == "Bottle in mouth" ~ "Responsive", # bottle in mouth as responsive??
+      next_behavior == "Burping" ~ "Responsive",
+      next_behavior == "Allows infant to hold bottle" ~ "Responsive",
       next_behavior == "Indicates feeding is over" ~ "Responsive",
-      TRUE ~ 'Other'
+      next_behavior == "Looks at phone or device" ~ "Uninvolved",
+      next_behavior == "Propped bottle" ~ "Uninvolved",
   ))
+
+all_dyad_table_data <- interaction_data %>%
+  filter(prev_behavior == "Bottle offered",
+         dyad_unit == "Baby") %>%
+  select(Behavior, next_behavior, next_behavior_group) %>%
+  group_by(Behavior)
 ```
 
 ## a,b) How often does this lead to a controlling maternal behavior (Pushes bottle into infant's mouth, Verbal stimulation of sucking or feeding, Physical stimulation of sucking or feeding)? How often does this lead to responsive behaviors (Verbal acknowledgement of fullness (or hunger), bottle-not-in-mouth, Indicates feeding is over)?
 
+#### For All Dyad Sets
+
 ```{r}
+
 interaction_data %>%
   select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch) %>%
   filter(prev_behavior == "Bottle offered",
@@ -57,6 +76,9 @@ interaction_data %>%
   coord_flip() +
   ggtitle("Number of Behaviors for each \nInfant Cue After Bottle is Offered")+
   theme(plot.title = element_text(size=12))
+
+with(all_dyad_table_data, table(Behavior, next_behavior_group)) %>%
+  kable(caption = "Number of Behaviors for each \nInfant Cue After Bottle is Offered")
 
 
 interaction_data %>%
@@ -70,6 +92,10 @@ interaction_data %>%
   coord_flip() +
   ggtitle("Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")+
   theme(plot.title = element_text(size=12))
+
+with(all_dyad_table_data, prop.table(table(Behavior, next_behavior_group),1)) %>%
+  kable(caption = "Proportion of Behaviors for each \nInfant Cue After Bottle is Offered",
+        digits = 3)
 
 
 interaction_data %>%
@@ -86,6 +112,18 @@ interaction_data %>%
   ggtitle("Proportion of Behaviors for Lip Compression \nand Blocks mouth After Bottle is Offered")+
   theme(plot.title = element_text(size=12))
 
+specific_behavior <- interaction_data %>%
+  filter(prev_behavior == "Bottle offered",
+         dyad_unit == "Baby") %>%
+  filter(Behavior == "Lip compression/does not open mouth" |
+         Behavior == "Blocks mouth with hands or feet") %>%
+  select(Behavior, next_behavior, next_behavior_group) %>%
+  group_by(Behavior)
+  
+with(specific_behavior, prop.table(table(Behavior, next_behavior_group)),1) %>%
+  kable(caption = "Proportion of Behaviors for Lip Compression \nand Blocks mouth After Bottle is Offered",
+        digits = 3)
+
 
 interaction_data %>%
   select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch) %>%
@@ -98,53 +136,99 @@ interaction_data %>%
   coord_flip() +
   ggtitle("Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")+
   theme(plot.title = element_text(size=12))
+
+with(all_dyad_table_data, prop.table(table(Behavior, next_behavior),1)) %>%
+  kable(caption = "Proportion of Behaviors for each \nInfant Cue After Bottle is Offered",
+        digits = 3)
+```
+
+
+
+#### By Dyad Set
+```{r}
+interaction_data %>%
+  select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch, dyad_set) %>%
+  filter(prev_behavior == "Bottle offered",
+         dyad_unit == "Baby") %>%
+  ggplot(aes(fill = next_behavior_group, x=Behavior)) +
+  geom_bar(position="stack",stat ="count") + 
+  labs(fill="Next Behavior") +
+  theme(axis.title.x=element_blank()) +
+  coord_flip() +
+  ggtitle("Number of Behaviors for each \nInfant Cue After Bottle is Offered")+
+  theme(plot.title = element_text(size=12)) +
+  facet_grid(~ dyad_set)
+
+
+dyad_set_table <- interaction_data %>%
+  filter(prev_behavior == "Bottle offered",
+         dyad_unit == "Baby") %>%
+  select(dyad_set, Behavior, next_behavior, next_behavior_group) %>%
+  group_by(Behavior, dyad_set)
+
+with(dyad_set_table, tabular(Behavior, dyad_set, next_behavior_group)) %>%
+  kable(caption = "Number of Behaviors for each \nInfant Cue After Bottle is Offered")
+
+
+interaction_data %>%
+  select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch, dyad_set) %>%
+  filter(prev_behavior == "Bottle offered",
+         dyad_unit == "Baby") %>%
+  ggplot(aes(fill = next_behavior_group, x=Behavior)) +
+  geom_bar(position="fill",stat ="count") + 
+  labs(fill="Next Behavior") +
+  theme(axis.title.x=element_blank()) +
+  coord_flip() +
+  ggtitle("Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")+
+  theme(plot.title = element_text(size=12)) +
+  facet_grid(~ dyad_set)
+
+
+interaction_data %>%
+  select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch, dyad_set) %>%
+  filter(prev_behavior == "Bottle offered",
+         dyad_unit == "Baby",
+         Behavior == "Lip compression/does not open mouth" |
+         Behavior == "Blocks mouth with hands or feet") %>%
+  ggplot(aes(fill = next_behavior_group, x=Behavior)) +
+  geom_bar(position="fill",stat ="count") + 
+  labs(fill="Next Behavior") +
+  theme(axis.title.x=element_blank()) +
+  coord_flip() +
+  ggtitle("Proportion of Behaviors for Lip Compression \nand Blocks mouth After Bottle is Offered")+
+  theme(plot.title = element_text(size=12)) +
+  facet_grid(~ dyad_set)
+
+
+interaction_data %>%
+  select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch, dyad_set) %>%
+  filter(prev_behavior == "Bottle offered",
+         dyad_unit == "Baby") %>%
+  ggplot(aes(fill = next_behavior, x=Behavior)) +
+  geom_bar(position="fill",stat ="count") + 
+  labs(fill="Next Behavior") +
+  theme(axis.title.x=element_blank()) +
+  coord_flip() +
+  ggtitle("Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")+
+  theme(plot.title = element_text(size=12)) +
+  facet_grid(~ dyad_set)
 ```
 
 ## c) How many subsequent bottle-offers occur until mother indicates feed is over?
 
 ```{r}
-median.quartile <- function(x){
-  out <- quantile(x, probs = c(0.25,0.5,0.75))
-  names(out) <- c("ymin","y","ymax")
-  return(out) 
-}
-
 interaction_data %>%
   filter(prev_behavior == "Bottle offered" | Behavior == "Indicates feeding is over") %>%
   select(dyad_unit, dyad_set, id, prev_behavior, Behavior) %>%
   mutate(prev_behavior = replace_na(prev_behavior, "NA")) %>%
   group_by(dyad_set, id) %>%
-  summarise(count = sum(prev_behavior == "Bottle offered")) %>%
-  ggplot(aes(x = dyad_set, y = count, color = dyad_set)) +
-  geom_violin(outlier.colour="black", outlier.shape=16,
-             outlier.size=2, notch=FALSE,
-             draw_quantiles = c(0.25, 0.5, 0.75)) +
-  geom_jitter(width=0.15, height=0.05, alpha=0.5, size=0.75) +
-  coord_flip() + 
-  xlab("") + 
-  ylab("") + 
-  theme(legend.position = "none") +
+  summarise(count_bottle_offers = sum(prev_behavior == "Bottle offered")) %>%
+  ggplot(aes(x = count_bottle_offers, color = dyad_set)) +
+  geom_freqpoly(stat = "count", binwidth = 1, linetype = "solid") + 
+  xlab("Number of Bottle Offers") + 
   theme(panel.grid.major.y = element_blank()) +
-  ggtitle("Number of Bottle Offers Until \nMom Indicates Feed is Over") +
-  scale_x_discrete(limits = rev)
+  ggtitle("Number of Bottle Offers Until \nMom Indicates Feed is Over") + 
+  labs(color='Dyad Set') 
 
-interaction_data %>%
-  filter(prev_behavior == "Bottle offered" | Behavior == "Indicates feeding is over") %>%
-  select(dyad_unit, dyad_set, id, prev_behavior, Behavior) %>%
-  mutate(prev_behavior = replace_na(prev_behavior, "NA")) %>%
-  group_by(dyad_set, id) %>%
-  summarise(count = sum(prev_behavior == "Bottle offered")) %>%
-  ggplot(aes(x = dyad_set, y = log(count + 1), color = dyad_set)) +
-  geom_violin(outlier.colour="black", outlier.shape=16,
-             outlier.size=2, notch=FALSE,
-             draw_quantiles = c(0.25, 0.5, 0.75)) +
-  geom_jitter(width=0.15, height=0.05, alpha=0.5, size=0.75) +
-  coord_flip() + 
-  xlab("") + 
-  ylab("") + 
-  theme(legend.position = "none") +
-  theme(panel.grid.major.y = element_blank()) +
-  ggtitle("Log(x+1) of Number of Bottle Offers Until \nMom Indicates Feed is Over") +
-  scale_x_discrete(limits = rev)
 ```
 
