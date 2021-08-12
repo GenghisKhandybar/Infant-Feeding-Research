@@ -1,0 +1,280 @@
+---
+title: "creating-quarterly-data"
+author: "Jake Esprabens"
+date: "5/6/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr) # need devtools version ?
+library(tibble)
+library(ggplot2)
+library(GGally)
+library(stringr)
+library(purrr)
+library(forcats)
+library(knitr)
+library(purrr)
+library(ggpubr)
+library(cowplot)
+library(gridExtra)
+
+library(gifski)
+library(gganimate)
+# devtools::install_github('haleyjeppson/ggmosaic')
+library(ggmosaic)
+
+
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE,
+                      warning = FALSE)
+
+# Vectorized sequence function
+# seq_vec(x, y) = c(x[1]:y[1], x[2]:y[2], ...)
+seq_vec <- Vectorize(seq.default, vectorize.args = c("from", "to"))
+
+
+
+```
+
+
+```{r, include = FALSE}
+
+behavior_codebook <- read_csv("behavior_codebook.csv")
+behaviors <- as.character(behavior_codebook$Behavior)
+names(behaviors) <- behavior_codebook$Behavior_group
+
+state_behaviors <- behavior_codebook %>%
+  filter(Event_Type == "State start") %>%
+  select(Behavior) %>%
+  pull()
+
+point_behaviors <- behavior_codebook %>%
+  filter(Event_Type == "State point") %>%
+  select(Behavior) %>%
+  pull()
+
+cues <- behavior_codebook %>%
+  filter(Behavior_group == "Infant Satiation Cues") %>%
+  select(Behavior) %>%
+  pull()
+
+state_point_duration <- 0.000000001 # for easier coding, treat state points as start/stop
+
+# Reorder dyad_set: 2wk, 2mo, 4mo
+dyad_set_levels <- c("2wkB", "2moB", "4moB", "6moB")
+
+n_time_points = length(dyad_set_levels)
+
+```
+
+
+Read raw data.
+Excel files have already been cleaned and combined into one file.
+
+```{r, read-data, include = FALSE}
+
+data <- read_csv("all_data.csv") %>%
+  mutate(Grouped_behavior = fct_recode(Behavior, !!!behaviors)) %>%
+  rename("id" = "ID_Number",
+         "coder_id" = "Coder") %>%
+  mutate(
+    Time_Relative_sf = as.double(Time_Relative_sf),
+    Duration_sf = as.double(Duration_sf),
+    Comment = as.logical(Comment),
+    id = factor(id),
+    Position_of_Infant = as.integer(Position_of_Infant),
+    time = as.double(time),
+    duration = as.double(duration),
+    dyad_set = factor(dyad_set, levels = dyad_set_levels),
+    Bottle_Rejector = factor(Bottle_Rejector)
+  )
+
+```
+
+
+Total number of dyads at each age
+
+
+```{r}
+
+n_dyads <- data %>%
+  group_by(dyad_set, Bottle_Rejector) %>%
+  summarize(n = n_distinct(id))
+
+n_dyads %>% kable()
+
+# two-way table?
+
+```
+
+List of dyads observed
+
+```{r}
+
+data_ids <- data %>%
+  group_by(dyad_set, id) %>%
+  summarize(id = first(id),
+            Bottle_Rejector = first(Bottle_Rejector))
+
+```
+
+
+Summarize which dyads are observed at which ages
+
+- 0.0 = not observed
+- 0.5 = observed, Bottle rejector
+- 1.0 = observed, not bottle rejector
+
+
+```{r}
+# Create data map - which dyads are in which set
+
+count_ones <- function(x){
+  length(x[x == 1])
+}
+
+count_positives <- function(x){
+  length(x[x > 0])
+}
+
+data_map <- data %>%
+  group_by(id, dyad_set) %>%
+  filter(row_number() == 1) %>% 
+  mutate(indicator = 1 - 0.5 * as.numeric(as.character(Bottle_Rejector))) %>%
+  select(id, dyad_set, indicator) %>% 
+  pivot_wider(names_from = dyad_set, values_from = indicator, values_fill = 0) %>%
+  ungroup() %>%
+  rowwise() %>%
+  mutate(Time_points_with_rejectors = count_positives(c_across(!id))) %>%
+  mutate(Time_points = count_ones(c_across(!c(id, Time_points_with_rejectors))))
+
+# write.csv(data_map,
+#           "data-map.csv",
+#           row.names = FALSE)
+
+```
+
+Summarize total number of dyads observed at each combination of ages
+
+
+```{r}
+
+data_age_summary <- data_map %>%
+  ungroup() %>%
+  mutate(across(where(is.numeric), ~round(.x + 0.1))) %>%
+  filter(!(id == "Total")) %>%
+  group_by(`2wkB`, `2moB`, `4moB`) %>%
+  summarize(count = n_distinct(id)) %>%
+  arrange(desc(`2wkB` + `2moB` + `4moB`), 
+          desc(`2wkB`), 
+          desc(`2moB`), 
+          desc(`4moB`))
+
+```
+
+```{r}
+
+data_age_summary_acceptors <- data_map %>%
+  ungroup() %>%
+  mutate(across(where(is.numeric), ~trunc(.x + 0.1))) %>%
+  filter(!(id == "Total")) %>%
+  group_by(`2wkB`, `2moB`, `4moB`) %>%
+  summarize(count = n_distinct(id)) %>%
+  arrange(desc(`2wkB` + `2moB` + `4moB`), 
+          desc(`2wkB`), 
+          desc(`2moB`), 
+          desc(`4moB`))
+
+```
+
+
+Add columns for end time of each behavior, video length, and start/end/duration as fraction of video length.
+
+
+```{r duration-data}
+# individual instances of each behavior
+# For each behavior, compute start time, end time, and duration
+# as fraction of feeding length
+
+data_duration <- data %>%
+  mutate(end_time = time + duration) %>%
+  group_by(dyad_set, id) %>%
+  mutate(duration_fraction = duration / max(end_time),
+         start_fraction = time / max(end_time),
+         end_fraction = end_time / max(end_time),
+         video_length = max(end_time)) %>%
+  filter(Event_Type %in% c("State start", "State point"))
+
+```
+
+Jake adds in chunk to make quarterly data
+
+```{r}
+# this adds in a quarter and half variable to easily mark which part of the video the behavior falls in
+data_duration <- data_duration %>% 
+  group_by(dyad_set, id) %>%
+  mutate(quarter = case_when(time < (video_length / 4) ~ 1,
+                             time < 2*(video_length / 4) & time >= (video_length / 4) ~ 2,
+                             time < 3*(video_length / 4) & time >= 2*(video_length / 4) ~ 3,
+                             time >= 3*(video_length / 4) ~ 4)) %>%
+  mutate(half = case_when(time < (video_length / 2) ~ 1,
+                          time >= 2*(video_length / 4) ~ 2
+                          ))
+```
+
+For each dyad, count number of instances and total time of each behavior, both absolute and relative to length of video.
+
+```{r dyad-totals}
+# Total count and time of each Behavior per dyad
+
+data_dyad_total <- data_duration %>%
+  group_by(dyad_set, id, Behavior) %>%
+  summarize(Bottle_Rejector = first(Bottle_Rejector),
+            Event_Type = first(Event_Type),
+            dyad_unit = first(dyad_unit),
+            Grouped_behavior = first(Grouped_behavior),
+            total_fraction = sum(duration_fraction), 
+            total_duration = sum(duration),
+            num_occurrences = n(),
+            video_length = max(video_length),
+            quarter = quarter) %>%
+  mutate(num_per_length = num_occurrences / video_length)
+
+
+```
+
+Add zeros for unobserved behaviors.
+One row for each possible behavior for each dyad at each age.
+
+
+```{r}
+quarterly_data_dyad_total_zeros <-
+  left_join(expand_grid(data_ids, behavior_codebook) %>%
+              rename(Grouped_behavior = Behavior_group),
+            data_dyad_total %>%
+              select_if(names(.) %in% c("dyad_set", "id", "Behavior") |
+                          sapply(., is.numeric)),
+            by = c("dyad_set", "id", "Behavior")) %>%
+  mutate(
+    across(where(is.numeric), ~replace_na(.x, 0))
+  ) %>%
+  group_by(dyad_set, id) %>%
+  mutate(video_length = max(video_length))
+
+write.csv(quarterly_data_dyad_total_zeros,
+          "quarterly-data-dyad-total-zeros.csv",
+          row.names = FALSE)
+```
+
+
+
+
+
+

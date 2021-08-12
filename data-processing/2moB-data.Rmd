@@ -1,0 +1,203 @@
+---
+title: "Two-Month Bottle Feeding: Data Processing"
+author: "Kevin Ross"
+date: "`r Sys.Date()`"
+output: html_document
+
+---
+
+# Setup
+
+```{r, include = FALSE}
+library(readxl)
+library(tidyverse)
+```
+
+
+```{r}
+behavior_codebook <- read_csv("behavior_codebook.csv")
+behaviors <- as.character(behavior_codebook$Behavior)
+names(behaviors) <- behavior_codebook$Behavior_group
+
+state_behaviors <- behavior_codebook %>%
+  filter(Event_Type == "State start") %>%
+  select(Behavior) %>%
+  pull()
+
+point_behaviors <- behavior_codebook %>%
+  filter(Event_Type == "State point") %>%
+  select(Behavior) %>%
+  pull()
+
+# face blocked already taken care of in video coding
+# face_blocked_removal <- 0.5 # exclude if face blocked > 50% of video
+
+state_point_duration <- 0.00001 # for easier coding, treat state points as start/stop
+
+```
+
+# Read raw data
+
+1. Combine all Excel files
+1. Separate "Observation" column into:
+  a. id = five-digit ID, e.g. 70138
+  a. dyad_set, e.g. 2wkB
+  a. coder_id, e.g. CJ
+  a. dyad_unit = Mom, Baby
+1. Main time variable is Time_Relative_sf
+1. Sort by dyad_id then by time
+1. Remove rows for the "redundant" state behaviors (Crying, Eyes Closed).  Can just have one binary variable for each state behavior (e.g. Crying: 1=Crying, 0=Not Crying)
+1. Change duration from 0 to 0.00001 for state points (makes a few coding items easier).
+1. Add time zero state start for Mom Bottle not in mouth, and a corresponding state stop.  (Mom files start with Bottle in mouth, but not exactly at time 0, so this fixes that.)
+1. Replace spaces with underscores in variable names
+1. Add column for regrouped behaviors
+
+
+```{r merge-raw-files}
+
+# Read all Excel files and combine
+# Using bind_rows, getting errors that date / char formats don't match
+# Some columns aren't needed anyway, so remove them before merging
+# Probably an easier way to read and combine Excel sheets than the following
+
+read_sheets <- function(file){
+  file %>%
+    set_names() %>%
+    map_df(read_excel, .id = 'Excel_file_name') %>% 
+    select(-(2:8)) # don't need the first few columns,
+  # and they cause date/char issues when combining
+  # Column 1 is ID; so keep it
+}
+  
+raw_data <- list.files(path = "./2 month bottle-feeding data", recursive = TRUE, pattern = "*.xlsx", full.names = TRUE) %>% 
+  map_df(~ read_sheets(.))
+
+data <- raw_data %>%
+  mutate(dyad_unit = ifelse(str_detect(`Excel_file_name`,"baby"), "Baby", "Mom")) %>%
+  select(-Excel_file_name) %>%
+  mutate(Observation = str_remove(Observation," Part 1"), # bit of data cleaning
+         Observation = str_remove(Observation," Part 2"),
+         Observation = str_remove(Observation," Part 3"),
+         Observation = str_remove(Observation,"(p1)"),
+         Observation = str_remove(Observation,"(p2)"),
+         Observation = str_remove(Observation,"(p3)"),
+         Observation = str_remove(Observation," pt1"),
+         Observation = str_remove(Observation," pt2"),
+         Observation = str_remove(Observation," pt3"),
+         Observation = str_remove(Observation,"\\(\\)"),
+         Observation = str_replace(Observation,"  "," ")) %>%
+  separate(Observation, c("ID Number", "dyad_set", "Coder"),
+           sep = " ", remove = FALSE, fill = "right") %>%
+  mutate(time = Time_Relative_sf) %>%
+  mutate(duration = ifelse(Event_Type == "State point",
+                           state_point_duration,
+                           Duration_sf)) %>%
+  arrange(`ID Number`, time) %>%
+  rename_all(~ gsub(" ", "_", .)) %>%# replace spaces with underscores in names
+  mutate(Comment = NA) %>% # added comment variable same as 4moB
+  mutate(Overall_Video_Quality = as.character(Overall_Video_Quality))
+
+# REORDER DATA
+data <- data[,c("Time_Relative_sf","Duration_sf","Result_Container","Observation", "Event_Log","Behavior","Event_Type","Comment","Bottle_Emptying","Coder","ID_Number","Other_People","Overall_Video_Quality","Position_of_Infant","TV_or_Radio_On","dyad_unit","Modifier_1","dyad_set","time","duration")]
+
+# For Mom, if does not start at time 0, add Bottle not in mouth at time 0
+# with duration equal to first start time for Bottle in mouth
+# also add a corresponding state end row 
+
+add_time_zero_start <- data %>%
+  filter(dyad_unit == "Mom") %>%
+  group_by(ID_Number) %>%
+  filter(min(time) > 0) %>%
+  filter(time == min(time)) %>% # first Mom event
+  mutate(Behavior = "Bottle not in mouth",
+         Duration_sf = time,
+         duration = time,
+         Time_Relative_sf = 0,
+         time = 0,
+         Event_Type = "State start",
+         Coder = "KJR")
+
+add_time_zero_end <- add_time_zero_start %>%
+  mutate(Time_Relative_sf = duration,
+         time = duration,
+         Duration_sf = 0,
+         duration = 0,
+         Event_Type = "State stop")
+
+data <- data %>%
+  bind_rows(add_time_zero_start) %>%
+  bind_rows(add_time_zero_end) %>%
+  arrange(ID_Number, time)
+
+data <- data %>%
+  mutate(Recoded_Behavior = case_when(
+    Behavior == "Blocks mouth with hands or feet" ~ "Blocks mouth",
+    Behavior == "Blocks mouth with hands" ~ "Blocks mouth",
+    Behavior == "Displays negative facial expression when not crying" ~ "Displays negative facial expression",
+    Behavior == "Leans away from bottle or arches back" ~ "Leans away or arches back",
+    Behavior == "Lip compression/does not open mouth for nipple" ~ "Lip compression/does not open mouth",
+    Behavior == "Shakes head or turns head/body away from nipple/bottle" ~ "Shakes head or turns head/body away",
+    Behavior == "Verbal question or acknowledgement of hunger" ~ "Verbal acknowledgement of hunger",
+    Behavior == "Verbal question or acknowledgement of fullness" ~ "Verbal acknowledgement of fullness",
+    TRUE ~ Behavior
+  )) %>%
+  mutate(Software_Behavior = Behavior,
+         Behavior = Recoded_Behavior) %>%
+  select(-Recoded_Behavior)
+
+rm(raw_data, add_time_zero_start, add_time_zero_end)  
+```
+
+```{r}
+# adding the bottle rejectors
+bottle_rej_2mo <- read_excel("Bottle Rejectors.xlsx",sheet = 2) %>%
+  filter(`Rejected? (1=yes, 0=no, 99=not coded)` == 1)
+
+data <- data %>%
+  mutate(Bottle_Rejector = ifelse(ID_Number %in% bottle_rej_2mo$id, 1,0))
+```
+
+
+# A few checks to make sure data is valid
+
+
+## Check that each  starts with "Bottle not in Mouth" (Code should return 0 rows)
+```{r}
+data %>%
+  filter(dyad_unit == "Mom") %>%
+  group_by(ID_Number)%>%
+  slice(1) %>%
+  select(Behavior) %>%
+  filter(!(Behavior == "Bottle not in mouth"))
+```
+
+
+## Check that each state start has a state stop (code should return 0 rows)
+
+```{r}
+data %>%
+  filter(Event_Type != "State point") %>% 
+  group_by(ID_Number, Behavior) %>%
+  summarize(start_count = sum(Event_Type == "State start"),
+            stop_count = sum(Event_Type == "State stop")) %>%
+  filter(start_count != stop_count) %>%
+  nrow()
+```
+
+## Check that behaviors are recorded correctly as Mom/Baby
+
+```{r}
+data %>% ungroup() %>%
+  group_by(Behavior, dyad_unit) %>%
+  summarize(n = n())
+
+data %>% ungroup() %>% 
+  filter(dyad_unit == "Mom") %>%
+  filter(Behavior %in% c("Not Crying", "Eyes Open"))
+```
+
+# Export the data as a csv
+```{r}
+# exporting data, saves a csv of data to current directory
+write.csv(data, "./data-2moB.csv", row.names = FALSE)
+```

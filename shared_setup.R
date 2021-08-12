@@ -68,6 +68,11 @@ data <- read_csv("data.csv") %>%
   mutate(Behavior = replace(Behavior, Behavior == "Blocks mouth", "Blocks mouth with hands or feet")) %>% 
   filter(Bottle_Rejector %in% include_rejectors)
 
+# Reading data_time_event.csv
+
+data_time_event <- read.csv("data_time_event.csv") %>% 
+  mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels))
+
 # Reading data_dyad_total_zeros ----------------------------------------------------
 
 data_dyad_total_zeros <- read_csv("data-dyad-total-zeros.csv") %>%
@@ -161,15 +166,18 @@ ratio_lines = seq(1, 4, 0.5)
 
 # 5 number summary function -----------------
 
-summary_5_num <- function(df_grouped) {
+summary_5_num <- function(df_grouped, to_summarise) {
+  
   df_grouped %>% 
     summarise(
       n = n(),
-      min = min(time_before_end),
-      q1 = quantile(time_before_end, 0.25), 
-      median = median(time_before_end), 
-      q3 = quantile(time_before_end, 0.75), 
-      max=max(time_before_end)
+      min = min(!!as.name(to_summarise)),
+      q1 = quantile(!!as.name(to_summarise), 0.25), 
+      median = median(!!as.name(to_summarise)), 
+      q3 = quantile(!!as.name(to_summarise), 0.75), 
+      max=max(!!as.name(to_summarise)),
+      mean = mean(!!as.name(to_summarise)),
+      std = sd(!!as.name(to_summarise))
     ) %>% 
     arrange(-median) %>% 
     return()
