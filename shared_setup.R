@@ -39,7 +39,7 @@ if(!exists("include_rejectors")) #Default to only accept non-rejectors
 
 data_duration <- read.csv("data_duration.csv")
 
-dyad_set_levels <- c("2wkB", "2moB", "4moB", "6moB")
+dyad_set_levels <- data_duration %>% distinct(dyad_set) %>% pull()
 n_time_points = length(dyad_set_levels) # Not sure if this is used, but it's here to make sure there's no problems
 
 data_duration <- data_duration %>% 
