@@ -1,0 +1,92 @@
+---
+title: "cluster-analysis"
+author: "William Medwid"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+---
+
+This analysis excludes bottle rejectors.
+
+<!-- # Setup -->
+
+```{r setup, include=FALSE}
+include_rejectors <- c(0)
+source("shared_setup.R")
+```
+
+## Actions per minute between clusters
+
+Clusters are based on actions per minute of mother and baby, as well as feeding duration. The clusters' order is randomly determined.
+
+```{r}
+n_clusters <- 4
+
+data_total_simple <- data_dyad_total_zeros %>% 
+  group_by(id, dyad_set, dyad_unit) %>% 
+  summarise(actions_per_minute = sum(num_per_length), video_mins = first(video_mins)) %>% 
+  pivot_wider(id_cols = c(id, dyad_set), 
+              names_from = dyad_unit, 
+              values_from = c(actions_per_minute, video_mins)) %>% 
+  mutate(video_mins = video_mins_Mom) %>% 
+  select(-video_mins_Mom, -video_mins_Baby)
+
+kmeans <- data_total_simple %>% 
+  ungroup() %>% 
+  select(-id, -dyad_set) %>% 
+  kmeans(centers = n_clusters)
+
+
+data_total_clustered <- data_total_simple %>% 
+  cbind(cluster = as.factor(kmeans$cluster))
+
+data_total_clustered %>% 
+  ggplot(aes(x = actions_per_minute_Baby, y = actions_per_minute_Mom, colour = cluster, size = video_mins)) +
+  geom_point(alpha = 0.5) +
+  facet_grid(~dyad_set)
+
+kmeans$centers %>% cbind(cluster = 1:n_clusters) %>% kable(digits = 2, caption = "Cluster centroids")
+```
+
+## Behavior differences between clusters
+
+```{r}
+dyad_cluster_by_set <- data_total_clustered %>% 
+  distinct(dyad_set, id, .keep_all = TRUE) %>% 
+  select(dyad_set, id, cluster)
+
+data_dyad_total_zeros_clusters <- data_dyad_total_zeros %>% 
+  mutate(id = as.factor(id)) %>% 
+  left_join(dyad_cluster_by_set, x_names = c(dyad_set, id), y_names = c(dyad_set, id))
+
+line_plot <- function(group){
+  behaviors <- behavior_codebook %>% filter(Narrow_group == group) %>% pull(Behavior)
+  
+  data_dyad_total_zeros_clusters %>% 
+    filter(Behavior %in% behaviors) %>% 
+    group_by(Behavior, cluster) %>% 
+    summarise(n_occurrences = sum(if_else(num_occurrences > 0, 1, 0)),
+              n = n()) %>% 
+    mutate(prop = n_occurrences / n) %>% 
+      ggplot(aes(color=Behavior, 
+                 group=Behavior,
+                 linetype=Behavior,
+                 y=prop, 
+                 x = cluster
+                 )) +
+      geom_point() +
+      geom_line() +
+      ylim(0,1)
+}
+
+line_plot("Potent")
+line_plot("Subtle")
+line_plot("Responsive")
+line_plot("Controlling-Limiting")
+line_plot("Controlling-Encouragment")
+line_plot("Uninvolved")
+```
+
