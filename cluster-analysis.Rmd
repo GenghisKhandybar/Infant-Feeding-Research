@@ -18,11 +18,13 @@ include_rejectors <- c(0)
 source("shared_setup.R")
 ```
 
+# Simple clustering
+
 ## Actions per minute between clusters
 
 Clusters are based on actions per minute of mother and baby, as well as feeding duration. The clusters' order is randomly determined.
 
-```{r}
+```{r reshape-basic}
 n_clusters <- 4
 
 data_total_simple <- data_dyad_total_zeros %>% 
@@ -43,17 +45,29 @@ kmeans <- data_total_simple %>%
 data_total_clustered <- data_total_simple %>% 
   cbind(cluster = as.factor(kmeans$cluster))
 
+
+```
+
+```{r initial-summary}
+# bubble plot
 data_total_clustered %>% 
   ggplot(aes(x = actions_per_minute_Baby, y = actions_per_minute_Mom, colour = cluster, size = video_mins)) +
   geom_point(alpha = 0.5) +
   facet_grid(~dyad_set)
+
+#dyad proportions
+p <- data_total_clustered %>% 
+  ggplot(aes(x = dyad_set, fill = cluster)) +
+  geom_bar(position = "fill") +
+  ggtitle("Proportion of each dyad set in each cluster")
+p %>% ggplotly()
 
 kmeans$centers %>% cbind(cluster = 1:n_clusters) %>% kable(digits = 2, caption = "Cluster centroids")
 ```
 
 ## Behavior prevailence differences between clusters
 
-```{r}
+```{r full-plot-prop}
 dyad_cluster_by_set <- data_total_clustered %>% 
   distinct(dyad_set, id, .keep_all = TRUE) %>% 
   select(dyad_set, id, cluster)
@@ -110,13 +124,15 @@ data_dyad_total_zeros_clusters %>% line_plot("Controlling-Encouragment")
 data_dyad_total_zeros_clusters %>% line_plot("Uninvolved")
 ```
 
-Behavior groups appear nearly the same across all four of the clusters, with the more active dyads being more active in all categories at a nearly uniform level, other than controlling-limiting behaviors, which were similarly low across all clusters. Some individual behaviors do vary out of line with the overall activity levels, such as eyes closed, bites or chews nipple, and burping.
+Behavior groups appear nearly the same across all four of the clusters, with the more active dyads being more active in all categories at a nearly uniform level, other than controlling-limiting behaviors, which were similarly low across all clusters. Some individual behaviors do vary out of line with the overall activity levels, such as eyes closed, bites or chews nipple, and burping. 
+
+For example, eyes closed is very common in feedings that take a long time (~30 minutes) with both baby and mom being fairly inactive.
 
 ## Behavior frequencies across clusters
 
 The plots below show behavior frequencies among dyads who displayed a behavior at least once during the feeding.
 
-```{r}
+```{r full-plot-freq}
 p <- data_dyad_total_zeros_clusters %>% 
   filter(num_occurrences > 0) %>% 
   group_by(Narrow_group, cluster) %>% # , dyad_set) %>% 
@@ -149,6 +165,7 @@ line_plot <- function(data_dyad_total_zeros_clusters, group){
                x = cluster
                )) +
     ggtitle(group) +
+    ylab("Mean behaviors per minute (0's excluded)") +
     geom_point() +
     geom_line() +
     ylim(0,1)
@@ -162,3 +179,42 @@ data_dyad_total_zeros_clusters %>% line_plot("Controlling-Encouragment")
 data_dyad_total_zeros_clusters %>% line_plot("Uninvolved")
 ```
 
+# Clustering method #2
+
+This clustering will cluster dyads based on their cues per minute of each cue.
+
+```{r complex-cluster}
+data_dyad_cues_per_min <- data_dyad_total_zeros %>% 
+  pivot_wider(id_cols = c(id, dyad_set), values_from = num_per_min, names_from = Behavior)
+
+kmeans <- data_dyad_cues_per_min %>% 
+  ungroup() %>% 
+  select(-id, -dyad_set) %>% 
+  kmeans(centers = n_clusters)
+
+
+data_total_clustered <- data_total_simple %>% 
+  cbind(cluster = as.factor(kmeans$cluster))
+
+# data_total_clustered %>% 
+#   ggplot(aes(x = actions_per_minute_Baby, y = actions_per_minute_Mom, colour = cluster, size = video_mins)) +
+#   geom_point(alpha = 0.5) +
+#   facet_grid(~dyad_set)
+```
+
+```{r ref.label = "initial-summary", eval = TRUE}
+```
+
+## Proportions by cluster
+
+```{r ref.label = "full-plot-prop", eval = TRUE}
+```
+
+## Frequencies by cluster
+
+The plots below show behavior frequencies among dyads who displayed a behavior at least once during the feeding.
+
+The clusters are based entirely on dyads' behavior frequencies during each individual feeding (one dyad may be in different clusters for each feeding). Therefore, the combination of the proportion charts above and the frequency charts below must explain the largest differences between groups of types of feedings.
+
+```{r ref.label = "full-plot-freq", eval = TRUE}
+```
