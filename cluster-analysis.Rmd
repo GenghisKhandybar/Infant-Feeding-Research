@@ -51,7 +51,7 @@ data_total_clustered %>%
 kmeans$centers %>% cbind(cluster = 1:n_clusters) %>% kable(digits = 2, caption = "Cluster centroids")
 ```
 
-## Behavior differences between clusters
+## Behavior prevailence differences between clusters
 
 ```{r}
 dyad_cluster_by_set <- data_total_clustered %>% 
@@ -62,12 +62,31 @@ data_dyad_total_zeros_clusters <- data_dyad_total_zeros %>%
   mutate(id = as.factor(id)) %>% 
   left_join(dyad_cluster_by_set, x_names = c(dyad_set, id), y_names = c(dyad_set, id))
 
-line_plot <- function(group){
+p <- data_dyad_total_zeros_clusters %>% 
+    filter(Wide_group != "Baseline") %>% 
+    group_by(Narrow_group, cluster) %>% # , dyad_set) %>% 
+    summarise(n_occurrences = sum(if_else(num_occurrences > 0, 1, 0)),
+              n = n()) %>% 
+    mutate(prop = n_occurrences / n) %>% 
+      ggplot(aes(color=Narrow_group, 
+                 group=Narrow_group,
+                 linetype=Narrow_group,
+                 y=prop, 
+                 x = cluster
+                 )) +
+    #facet_grid(~dyad_set) + 
+      geom_point() +
+      geom_line() +
+      ylim(0,1)
+
+p %>% ggplotly()
+
+line_plot <- function(data_dyad_total_zeros_clusters, group){
   behaviors <- behavior_codebook %>% filter(Narrow_group == group) %>% pull(Behavior)
   
   data_dyad_total_zeros_clusters %>% 
     filter(Behavior %in% behaviors) %>% 
-    group_by(Behavior, cluster) %>% 
+    group_by(Behavior, cluster) %>% # , dyad_set) %>% 
     summarise(n_occurrences = sum(if_else(num_occurrences > 0, 1, 0)),
               n = n()) %>% 
     mutate(prop = n_occurrences / n) %>% 
@@ -77,16 +96,69 @@ line_plot <- function(group){
                  y=prop, 
                  x = cluster
                  )) +
+    #facet_grid(~dyad_set) + 
       geom_point() +
       geom_line() +
       ylim(0,1)
 }
 
-line_plot("Potent")
-line_plot("Subtle")
-line_plot("Responsive")
-line_plot("Controlling-Limiting")
-line_plot("Controlling-Encouragment")
-line_plot("Uninvolved")
+data_dyad_total_zeros_clusters %>% line_plot("Potent")
+data_dyad_total_zeros_clusters %>% line_plot("Subtle")
+data_dyad_total_zeros_clusters %>% line_plot("Responsive")
+data_dyad_total_zeros_clusters %>% line_plot("Controlling-Limiting")
+data_dyad_total_zeros_clusters %>% line_plot("Controlling-Encouragment")
+data_dyad_total_zeros_clusters %>% line_plot("Uninvolved")
+```
+
+Behavior groups appear nearly the same across all four of the clusters, with the more active dyads being more active in all categories at a nearly uniform level, other than controlling-limiting behaviors, which were similarly low across all clusters. Some individual behaviors do vary out of line with the overall activity levels, such as eyes closed, bites or chews nipple, and burping.
+
+## Behavior frequencies across clusters
+
+The plots below show behavior frequencies among dyads who displayed a behavior at least once during the feeding.
+
+```{r}
+p <- data_dyad_total_zeros_clusters %>% 
+  filter(num_occurrences > 0) %>% 
+  group_by(Narrow_group, cluster) %>% # , dyad_set) %>% 
+  summarise(avg_per_minute = mean(num_per_min)) %>% 
+  ggplot(aes(color=Narrow_group, 
+             group=Narrow_group,
+             linetype=Narrow_group,
+             y=avg_per_minute, 
+             x = cluster
+             )) +
+  ggtitle("Grouped behaviors") +
+  geom_point() +
+  geom_line() +
+  ylim(0,1)
+
+p %>% ggplotly()
+
+line_plot <- function(data_dyad_total_zeros_clusters, group){
+  behaviors <- behavior_codebook %>% filter(Narrow_group == group) %>% pull(Behavior)
+  
+  data_dyad_total_zeros_clusters %>% 
+    filter(num_occurrences > 0) %>% 
+    filter(Behavior %in% behaviors) %>% 
+    group_by(Behavior, cluster) %>% # , dyad_set) %>% 
+    summarise(avg_per_minute = mean(num_per_min)) %>% 
+    ggplot(aes(color=Behavior, 
+               group=Behavior,
+               linetype=Behavior,
+               y=avg_per_minute, 
+               x = cluster
+               )) +
+    ggtitle(group) +
+    geom_point() +
+    geom_line() +
+    ylim(0,1)
+}
+
+data_dyad_total_zeros_clusters %>% line_plot("Potent")
+data_dyad_total_zeros_clusters %>% line_plot("Subtle")
+data_dyad_total_zeros_clusters %>% line_plot("Responsive")
+data_dyad_total_zeros_clusters %>% line_plot("Controlling-Limiting")
+data_dyad_total_zeros_clusters %>% line_plot("Controlling-Encouragment")
+data_dyad_total_zeros_clusters %>% line_plot("Uninvolved")
 ```
 
