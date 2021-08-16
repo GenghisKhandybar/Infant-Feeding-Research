@@ -19,6 +19,8 @@ source("shared_setup.R")
 
 ## Final cues distribution
 
+Final infant cue before end of session
+
 ```{r final_cues}
 final_cue <- data_duration %>% 
   filter(dyad_unit == "Baby") %>% 
@@ -52,7 +54,7 @@ last_cue_counts %>%
   facet_grid(cols = vars(dyad_set)) +
   ylab("Final Satiation Cue") +
   xlab("Percent of final cues") +
-  ggtitle("Final infant cue before end of session")+ 
+  # ggtitle("Final infant cue before end of session")+ 
   theme(legend.position = "none") #The fill colors are purely aesthetic so the legend is removed.
 ```
 
