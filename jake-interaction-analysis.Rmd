@@ -18,10 +18,6 @@ source("shared_setup.R")
 
 
 ```{r}
-data %>% filter(id == 70174 & dyad_set == "2wkB") %>% select(Time_Relative_sf, Duration_sf, Behavior)
-```
-
-```{r}
 interaction_data <- data_duration %>% 
   mutate(next_dyad_unit = lead(dyad_unit),
          switch = if_else(next_dyad_unit == dyad_unit, 0, 1)) %>% 
@@ -34,8 +30,7 @@ interaction_data <- data_duration %>%
   
   ungroup() %>%
   mutate(prev_behavior = if_else(lag(switch) == 1, lag(Behavior), NULL)) %>%
-  # group_by(id, dyad_set, chain_group) %>% 
-  # mutate(prev_behavior = if_else(prev_behavior == "NA", last(prev_behavior), prev_behavior))
+
   mutate(next_behavior_group = case_when(
       next_behavior == "Pushes bottle into infant's mouth" ~ "Controlling",
       next_behavior == "Verbal stimulation of sucking or feeding" ~ "Controlling",
@@ -51,6 +46,8 @@ interaction_data <- data_duration %>%
       next_behavior == "Looks at phone or device" ~ "Uninvolved",
       next_behavior == "Propped bottle" ~ "Uninvolved",
   ))
+  
+
 
 all_dyad_table_data <- interaction_data %>%
   filter(prev_behavior == "Bottle offered",
@@ -78,7 +75,9 @@ interaction_data %>%
   theme(plot.title = element_text(size=12))
 
 with(all_dyad_table_data, table(Behavior, next_behavior_group)) %>%
+  addmargins(margin = 2,FUN = list("Total Count" = sum)) %>%
   kable(caption = "Number of Behaviors for each \nInfant Cue After Bottle is Offered")
+  
 
 
 interaction_data %>%
@@ -145,6 +144,16 @@ with(all_dyad_table_data, prop.table(table(Behavior, next_behavior),1)) %>%
 
 
 #### By Dyad Set
+
+```{r}
+#making the data for the tables
+dyad_set_table <- interaction_data %>%
+  filter(prev_behavior == "Bottle offered",
+         dyad_unit == "Baby") %>%
+  select(dyad_set, Behavior, next_behavior, next_behavior_group) %>%
+  group_by(Behavior, dyad_set)
+```
+
 ```{r}
 interaction_data %>%
   select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch, dyad_set) %>%
@@ -159,15 +168,18 @@ interaction_data %>%
   theme(plot.title = element_text(size=12)) +
   facet_grid(~ dyad_set)
 
+# still looking for a better solution for a table
+with(dyad_set_table[dyad_set_table$dyad_set == "2wkB",], table(Behavior, next_behavior_group)) %>%
+  kable(caption = "2 Week - Number of Behaviors for each \nInfant Cue After Bottle is Offered")
 
-dyad_set_table <- interaction_data %>%
-  filter(prev_behavior == "Bottle offered",
-         dyad_unit == "Baby") %>%
-  select(dyad_set, Behavior, next_behavior, next_behavior_group) %>%
-  group_by(Behavior, dyad_set)
+with(dyad_set_table[dyad_set_table$dyad_set == "2moB",], table(Behavior, next_behavior_group)) %>%
+  kable(caption = "2 Month - Number of Behaviors for each \nInfant Cue After Bottle is Offered")
 
-with(dyad_set_table, tabular(Behavior, dyad_set, next_behavior_group)) %>%
-  kable(caption = "Number of Behaviors for each \nInfant Cue After Bottle is Offered")
+with(dyad_set_table[dyad_set_table$dyad_set == "4moB",], table(Behavior, next_behavior_group)) %>%
+  kable(caption = "4 Month - Number of Behaviors for each \nInfant Cue After Bottle is Offered")
+
+with(dyad_set_table[dyad_set_table$dyad_set == "6moB",], table(Behavior, next_behavior_group)) %>%
+  kable(caption = "6 Month - Number of Behaviors for each \nInfant Cue After Bottle is Offered")
 
 
 interaction_data %>%
@@ -183,6 +195,18 @@ interaction_data %>%
   theme(plot.title = element_text(size=12)) +
   facet_grid(~ dyad_set)
 
+
+with(dyad_set_table[dyad_set_table$dyad_set == "2wkB",], prop.table(table(Behavior, next_behavior_group),1)) %>%
+  kable(caption = "2 Week - Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")
+
+with(dyad_set_table[dyad_set_table$dyad_set == "2moB",], prop.table(table(Behavior, next_behavior_group),1)) %>%
+  kable(caption = "2 Month - Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")
+
+with(dyad_set_table[dyad_set_table$dyad_set == "4moB",], prop.table(table(Behavior, next_behavior_group),1)) %>%
+  kable(caption = "4 Month - Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")
+
+with(dyad_set_table[dyad_set_table$dyad_set == "6moB",], prop.table(table(Behavior, next_behavior_group),1)) %>%
+  kable(caption = "6 Month - Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")
 
 interaction_data %>%
   select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch, dyad_set) %>%
@@ -199,6 +223,29 @@ interaction_data %>%
   theme(plot.title = element_text(size=12)) +
   facet_grid(~ dyad_set)
 
+with(dyad_set_table %>% filter(
+        dyad_set == "2wkB",
+         Behavior == "Lip compression/does not open mouth" |
+         Behavior == "Blocks mouth with hands or feet"), prop.table(table(Behavior, next_behavior_group),1)) %>%
+  kable(caption = "2 Week - Proportion of Behaviors for \nLip compression does not open mouth and Blocks mouth")
+
+with(dyad_set_table %>% filter(
+        dyad_set == "2moB",
+         Behavior == "Lip compression/does not open mouth" |
+         Behavior == "Blocks mouth with hands or feet"), prop.table(table(Behavior, next_behavior_group),1)) %>%
+  kable(caption = "2 Month - Proportion of Behaviors for \nLip compression does not open mouth and Blocks mouth")
+
+with(dyad_set_table %>% filter(
+        dyad_set == "4moB",
+         Behavior == "Lip compression/does not open mouth" |
+         Behavior == "Blocks mouth with hands or feet"), prop.table(table(Behavior, next_behavior_group),1)) %>%
+  kable(caption = "4 Month - Proportion of Behaviors for \nLip compression does not open mouth and Blocks mouth")
+
+with(dyad_set_table %>% filter(
+        dyad_set == "6moB",
+         Behavior == "Lip compression/does not open mouth" |
+         Behavior == "Blocks mouth with hands or feet"), prop.table(table(Behavior, next_behavior_group),1)) %>%
+  kable(caption = "6 Month - Proportion of Behaviors for \nLip compression does not open mouth and Blocks mouth")
 
 interaction_data %>%
   select(dyad_unit, prev_behavior, Behavior, next_behavior, next_behavior_group, switch, dyad_set) %>%
@@ -212,6 +259,18 @@ interaction_data %>%
   ggtitle("Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")+
   theme(plot.title = element_text(size=12)) +
   facet_grid(~ dyad_set)
+
+with(dyad_set_table[dyad_set_table$dyad_set == "2wkB",], prop.table(table(Behavior, next_behavior),1)) %>%
+  kable(caption = "2 Week - Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")
+
+with(dyad_set_table[dyad_set_table$dyad_set == "2moB",], prop.table(table(Behavior, next_behavior),1)) %>%
+  kable(caption = "2 Month - Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")
+
+with(dyad_set_table[dyad_set_table$dyad_set == "4moB",], prop.table(table(Behavior, next_behavior),1)) %>%
+  kable(caption = "4 Month - Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")
+
+with(dyad_set_table[dyad_set_table$dyad_set == "6moB",], prop.table(table(Behavior, next_behavior),1)) %>%
+  kable(caption = "6 Month - Proportion of Behaviors for each \nInfant Cue After Bottle is Offered")
 ```
 
 ## c) How many subsequent bottle-offers occur until mother indicates feed is over?
@@ -231,4 +290,85 @@ interaction_data %>%
   labs(color='Dyad Set') 
 
 ```
+
+```{r}
+interaction_data %>%
+  filter(prev_behavior == "Bottle offered" | Behavior == "Indicates feeding is over") %>%
+  select(dyad_unit, dyad_set, id, prev_behavior, Behavior) %>%
+  mutate(prev_behavior = replace_na(prev_behavior, "NA")) %>%
+  group_by(dyad_set,id) %>%
+  summarise(count_bottle_offers = sum(prev_behavior == "Bottle offered")) %>%
+  group_by(dyad_set) %>%
+  summarise_at(vars(count_bottle_offers),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 4)
+
+```
+
+
+```{r}
+# Becase this is continuous, I used a violin plot
+bottle_offers <- interaction_data %>%
+  group_by(dyad_set, id) %>%
+  filter(Behavior == "Bottle offered") %>%
+  slice(1) %>%
+  mutate(bottle_offer_time = time) %>%
+  select(dyad_set, id, Behavior, bottle_offer_time)
+
+
+feed_over <- interaction_data %>%
+  group_by(dyad_set, id) %>%
+  filter(Behavior == "Indicates feeding is over") %>%
+  slice(1) %>%
+  mutate(feeding_over_time = time) %>%
+  select(dyad_set, id, Behavior, feeding_over_time)
+
+
+bottle_offers %>% 
+  left_join(feed_over, by =c("dyad_set", "id")) %>%
+  select(dyad_set, id, bottle_offer_time, feeding_over_time) %>%
+  mutate(bot_offer_per_min = (feeding_over_time - bottle_offer_time) / 60) %>%
+  ggplot(aes(x = dyad_set, y = bot_offer_per_min, color = dyad_set)) +
+  geom_violin() +
+  geom_jitter() +
+  theme(panel.grid.major.y = element_blank()) +
+  ggtitle("Number of Bottle Offers Per Mintue Until \nMom Indicates Feed is Over") + 
+  labs(color='Dyad Set') +
+  coord_flip() +
+  ylab("Number of Bottle Offers Per Minute") +
+  xlab("") +
+  theme(legend.title = element_blank()) +
+  scale_x_discrete(limits=rev)
+  
+  
+# there is an instance where the bot_offer_per_min is < 0.  Because the first time the bottle was offered was after indicates feeding is over. is this possible?
+  # for 2wk, 70346
+```
+
+
+```{r}
+bottle_offers %>% 
+  left_join(feed_over, by =c("dyad_set", "id")) %>%
+  select(dyad_set, id, bottle_offer_time, feeding_over_time) %>%
+  mutate(bot_offer_per_min = (feeding_over_time - bottle_offer_time) / 60) %>%
+  group_by(dyad_set) %>%
+  drop_na() %>%
+  summarise_at(vars(bot_offer_per_min),
+               list(size = ~length(.),
+                    ~mean(.),
+                    ~sd(.),
+                    ~min(.),
+                    Q1 = ~quantile(., 0.25),
+                    ~median(.), Q3 = ~quantile(., 0.75),
+                    ~max(.))) %>%
+  kable(digits = 4)
+
+```
+
 
