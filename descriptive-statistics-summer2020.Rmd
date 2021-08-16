@@ -752,6 +752,18 @@ data_time_event %>%
   xlab("Infant cue") +
   ggtitle("Infant cues during bottle-in-mouth bouts") +
   facet_grid(~ dyad_set)
+
+data_time_event %>% 
+  filter(!is.na(cue_at_time)) %>%
+  group_by(dyad_set, cue_at_time) %>% 
+  summarise(count = n()) %>% 
+  group_by(dyad_set) %>% 
+  mutate(total = sum(count),
+         proportion = count / total) %>% 
+  ungroup() %>% 
+  arrange(cue_at_time, dyad_set) %>% 
+  select(dyad_set, cue_at_time, proportion, count, total) %>% 
+  kable(digits = 3, caption = "Infant cues during bottle-in-mouth bouts")
 ```
 
 Now consider the timing of the last cue.
@@ -785,6 +797,12 @@ plot_grid(plot_bottle_in_mouth_pdf,
           rel_heights = c(1, 1),
           ncol = 1, nrow = 2,
           align = "h")
+
+bottle_in_mouth_bouts_last_cue %>% 
+  group_by(dyad_set) %>% 
+  summary_5_num(to_summarise = "time_fraction_bottle_state") %>% 
+  arrange(dyad_set) %>% 
+  kable(digits = 3, caption = "Proportional time of last infant cue during Bottle-in-mouth bouts")
 ```
 
 
@@ -823,6 +841,11 @@ plot_grid(plot_bottle_in_mouth_pdf,
           ncol = 1, nrow = 2,
           align = "h")
 
+bottle_in_mouth_bouts_last_cue %>% 
+  group_by(dyad_set) %>% 
+  summary_5_num(to_summarise = "time_remaining_in_bottle_state") %>% 
+  arrange(dyad_set) %>% 
+  kable(digits = 3, caption = "Remaining time in bout after last infant cue during Bottle-in-mouth bouts")
 ```
 
 In most instances the last cue occurs right before the end of the bout, but there  is a long right tail.
@@ -840,6 +863,13 @@ ggplot(bottle_in_mouth_bouts_last_cue,
   xlab("Last cue in bout") +
   ggtitle("Time from last cue until end of bout (sec)") +
   facet_grid(cols = vars(dyad_set))
+
+bottle_in_mouth_bouts_last_cue %>% 
+  filter(!is.na(cue_at_time)) %>%
+  group_by(dyad_set, cue_at_time) %>% 
+  summary_5_num(to_summarise = "time_fraction_bottle_state") %>% 
+  arrange(cue_at_time, dyad_set) %>% 
+  kable(digits = 2, caption = "Time from last cue until end of bout (sec)")
 ```
 
 ```{r}
@@ -854,6 +884,12 @@ ggplot(bottle_in_mouth_bouts_last_cue,
   ggtitle("Bottle-in-mouth bouts") +
   facet_grid(cols = vars(dyad_set))
 
+bottle_in_mouth_bouts_last_cue %>% 
+  filter(!is.na(cue_at_time)) %>%
+  group_by(dyad_set, cue_at_time) %>% 
+  summary_5_num(to_summarise = "time_remaining_in_bottle_state") %>% 
+  arrange(cue_at_time, dyad_set) %>% 
+  kable(digits = 2, caption = "Time from last cue until end of bout (sec)")
 ```
 
 
@@ -908,24 +944,23 @@ final_bottle_in_mouth_bouts_last_cue <- data_time_event %>%
 # #data_time_event: Why is bottle offered almost always 1?
 # 
 # # First find the last 2 bottle in mouth bouts
-# final_two_bottle_in_mouth_bouts <- data_time_event %>% 
-#   filter(Bottle_in_mouth==1) %>% 
-#   group_by(dyad_set, id) %>% 
-#   distinct(dyad_set, id, Bottle_state_counter, .keep_all = TRUE) %>% 
-#   slice_max(n=2, order_by = Bottle_state_counter) %>% 
-#   select(dyad_set, id, Bottle_state_counter) %>% 
+# final_bottle_not_in_mouth_bouts <- data_time_event %>%
+#   filter(Bottle_not_in_mouth==1) %>%
+#   group_by(dyad_set, id) %>%
+#   slice_max(Bottle_state_counter) %>%
+#   select(dyad_set, id, Bottle_state_counter) %>%
 #   mutate(last_in_bout = max(Bottle_state_counter),
-#          first_in_bout = min(Bottle_state_counter)) %>% 
+#          first_in_bout = min(Bottle_state_counter)) %>%
 #   mutate(first_in_bout = if_else(first_in_bout == last_in_bout, 0, first_in_bout)) %>% #If there's only 1 feeding bout, set min to 0
-#   select(-Bottle_state_counter) %>% 
+#   select(-Bottle_state_counter) %>%
 #   distinct(dyad_set, id, .keep_all = TRUE)
 # 
 # # Then extract all bouts between the two
 # 
 # # final bottle not in mouth period BEFORE FINAL BOTTLE IN MOUTH PERIOD
 # 
-# final_bottle_not_in_mouth_period <- data_time_event %>% 
-#   left_join(final_two_bottle_in_mouth_bouts) %>% 
+# final_bottle_not_in_mouth_period <- data_time_event %>%
+#   left_join(final_two_bottle_in_mouth_bouts) %>%
 #   filter(Bottle_state_counter < last_in_bout & Bottle_state_counter > first_in_bout)
 # 
 # 
@@ -961,6 +996,11 @@ plot_grid(plot_final_bottle_in_mouth_pdf,
           ncol = 1, nrow = 2,
           align = "h")
 
+final_bottle_in_mouth_bouts %>% 
+  group_by(dyad_set) %>% 
+  summary_5_num(to_summarise = "num_cues") %>% 
+  arrange(dyad_set) %>% 
+  kable(digits = 3, caption = "Infant cues during final Bottle-in-mouth bout for each dyad")
 ```
 
 
@@ -975,8 +1015,8 @@ plot_bottle_in_mouth_pdf <- ggplot(final_bottle_in_mouth_bouts,
            fill = dyad_set)) +
    geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
   ylab("Density") +
-  xlab("Number of infant cues during final bout / length of final bout (cues / min)") +
-  ggtitle("Infant cues during final Bottle-in-mouth bouts")
+  xlab("Number of infant cues per minute of final bout") +
+  ggtitle("Infant cues/min during final Bottle-in-mouth bouts")
 
 
 # layer_data(p, 1) %>%
@@ -988,7 +1028,7 @@ plot_bottle_in_mouth_cdf <- ggplot(final_bottle_in_mouth_bouts,
            colour = dyad_set)) +
   stat_ecdf() +
   ylab("Cumulative proportion of bouts") +
-  xlab("Number of infant cues during final bout / length of final bout (cues / min)")
+  xlab("Number of infant cues per minute of final bout")
 
 plot_grid(plot_bottle_in_mouth_pdf,
           plot_bottle_in_mouth_cdf,
@@ -996,6 +1036,11 @@ plot_grid(plot_bottle_in_mouth_pdf,
           ncol = 1, nrow = 2,
           align = "h")
 
+final_bottle_in_mouth_bouts %>% 
+  group_by(dyad_set) %>% 
+  summary_5_num(to_summarise = "num_cues_by_minute") %>% 
+  arrange(dyad_set) %>% 
+  kable(digits = 3, caption = "Infant cues/min during final Bottle-in-mouth bouts")
 ```
 
 
@@ -1036,11 +1081,15 @@ plot_grid(plot_bottle_in_mouth_pdf,
           ncol = 1, nrow = 2,
           align = "h")
 
+final_bottle_in_mouth_bouts_end %>% 
+  group_by(dyad_set) %>% 
+  summary_5_num(to_summarise = "num_cues") %>% 
+  arrange(dyad_set) %>% 
+  kable(digits = 3, caption = "Infant cues during last 25% of duration of final Bottle-in-mouth bouts")
 ```
 
 
 ```{r}
-
 ggplot(final_bottle_in_mouth_bouts_end,
        aes(x = fct_lump(as.factor(num_cues), 3))) +
   geom_bar(aes(y = ..prop.., group = 1)) +
@@ -1049,6 +1098,16 @@ ggplot(final_bottle_in_mouth_bouts_end,
   ggtitle("Infant cues during last 25% of duration of final Bottle-in-mouth bouts") +
   facet_grid(~ dyad_set)
 
+final_bottle_in_mouth_bouts_end %>% 
+  group_by(dyad_set) %>% 
+  mutate(num_cues_lumped = fct_lump(as.factor(num_cues), 3)) %>% 
+  group_by(dyad_set, num_cues_lumped) %>% 
+  summarise(count = n()) %>% 
+  group_by(dyad_set) %>% 
+  mutate(total = sum(count),
+         proportion = count / total) %>% 
+  select(dyad_set, num_cues_lumped, proportion, count, total) %>% 
+  kable(digits = 2, caption = "Infant cues during last 25% of duration of final Bottle-in-mouth bouts")
 ```
 
 **Last cue in final bottle-in-mouth bout.**
@@ -1098,6 +1157,11 @@ plot_grid(plot_bottle_in_mouth_pdf,
           ncol = 1, nrow = 2,
           align = "h")
 
+final_bottle_in_mouth_bouts_last_cue %>% 
+  group_by(dyad_set) %>% 
+  summary_5_num("time_fraction_bottle_state") %>% 
+  arrange(dyad_set) %>% 
+  kable(digits = 2, caption = "Last infant cue during final Bottle-in-mouth bouts")
 ```
 
 
@@ -1132,6 +1196,11 @@ plot_grid(plot_bottle_in_mouth_pdf,
           ncol = 1, nrow = 2,
           align = "h")
 
+final_bottle_in_mouth_bouts_last_cue %>% 
+  group_by(dyad_set) %>% 
+  summary_5_num("time_remaining_in_bottle_state") %>% 
+  arrange(dyad_set) %>% 
+  kable(digits = 2, caption = "Last infant cue during final Bottle-in-mouth bouts")
 ```
 
 
@@ -1148,6 +1217,11 @@ ggplot(final_bottle_in_mouth_bouts_last_cue,
   ggtitle("Time of last cue as fraction of bout length") +
   facet_grid(~dyad_set)
 
+final_bottle_in_mouth_bouts_last_cue %>% 
+  group_by(dyad_set, cue_at_time) %>% 
+  summary_5_num("time_fraction_bottle_state") %>% 
+  arrange(cue_at_time, dyad_set) %>%
+  kable(digits = 2, caption = "Time of last cue as fraction of bout length")
 ```
 
 ```{r}
@@ -1162,6 +1236,11 @@ ggplot(final_bottle_in_mouth_bouts_last_cue,
   ggtitle("Final Bottle-in-mouth bouts") +
   facet_grid(~dyad_set)
 
+final_bottle_in_mouth_bouts_last_cue %>% 
+  group_by(dyad_set, cue_at_time) %>% 
+  summary_5_num("time_remaining_in_bottle_state") %>% 
+  arrange(cue_at_time, dyad_set) %>%
+  kable(digits = 2, caption = "Final Bottle-in-mouth bouts")
 ```
 
 
@@ -1197,7 +1276,7 @@ ggplot(data_time_event %>%
   geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
   ylab("Density") +
   xlab("Time of occurrence in bout (0 = start; 1 = end)") +
-  ggtitle("Infant cues during Bottle-in-mouth bouts") +
+  ggtitle("Infant cues during Bottle bouts") +
   facet_grid(~ dyad_set)
 
 
@@ -1234,7 +1313,7 @@ The table below summarizes the transitions between bottle states.
 ```{r}
 
 data_time_event %>% 
-  slice(1) %>%
+  #slice(1) %>%
   group_by(dyad_set, id) %>%
   mutate(next_bottle_state =
            dplyr::lead(Bottle_state, n = 1, default = NA)) %>%
