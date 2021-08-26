@@ -179,7 +179,7 @@ responses <- behavior_codebook %>% filter(dyad_unit == "Mom") %>% pull(Narrow_gr
 
 p <- infant_interactions %>% 
   heat_plot(responses, "First responses to infant behaviors (by category)") + facet_grid(cols = vars(dyad_set))
-p %>% ggplotly(tooltip = "text")
+p
 
 infant_interactions %>% 
   heat_table(responses, "dyad_set") %>% 
