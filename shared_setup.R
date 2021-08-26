@@ -35,18 +35,23 @@ knitr::opts_chunk$set(echo = FALSE,
 if(!exists("include_rejectors")) #Default to only accept non-rejectors
   include_rejectors <- c(0)
 
+# Full names for levels
+
+dyad_set_full_names <- c("2 weeks", "2 months", "4 months", "6 months")
+
 # Reading data_duration -------------------------------------------------------
 
 data_duration <- read.csv("data_duration.csv")
 
 dyad_set_levels <- data_duration %>% distinct(dyad_set) %>% pull()
+
 n_time_points = length(dyad_set_levels) # Not sure if this is used, but it's here to make sure there's no problems
 
 data_duration <- data_duration %>% 
   mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels)) %>%
   filter(Bottle_Rejector %in% include_rejectors)
 
-attr(data_duration$Time_Relative_sf, "label") = "Seconds into feeding"
+#levels(data_duration$dyad_set) <- dyad_set_full_names
 
 # Reading data (used in descriptive-statistics-summer2020) -------------------
 
