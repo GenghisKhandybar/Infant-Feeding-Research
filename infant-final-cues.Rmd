@@ -54,7 +54,6 @@ last_cue_counts %>%
   facet_grid(cols = vars(dyad_set)) +
   ylab("Final Satiation Cue") +
   xlab("Percent of final cues") +
-  # ggtitle("Final infant cue before end of session")+ 
   theme(legend.position = "none") #The fill colors are purely aesthetic so the legend is removed.
 ```
 
