@@ -40,6 +40,7 @@ p <- data_dyad_total_zeros %>%
   ylab("Mom behaviors per minute")
 
 p %>%  ggplotly(tooltip = "text")
+p
 ```
 
 
