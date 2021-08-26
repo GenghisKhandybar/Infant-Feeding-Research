@@ -51,8 +51,6 @@ data_duration <- data_duration %>%
   mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels)) %>%
   filter(Bottle_Rejector %in% include_rejectors)
 
-#levels(data_duration$dyad_set) <- dyad_set_full_names
-
 # Reading data (used in descriptive-statistics-summer2020) -------------------
 
 data <- read_csv("data.csv") %>% 
