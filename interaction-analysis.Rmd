@@ -281,7 +281,7 @@ p <- time_interactions %>%
   xlab("Response to behavior") +
   ggtitle("Baby cue response times")
 
-p %>% ggplotly(tooltip = "text")
+p# %>% ggplotly(tooltip = "text")
 
 p <- time_interactions %>% 
   filter(dyad_unit == "Mom") %>% 
@@ -305,7 +305,7 @@ p <- time_interactions %>%
   xlab("Response to behavior") +
   ggtitle("Mom behavior response times")
 
-p %>% ggplotly(tooltip = "text")
+p# %>% ggplotly(tooltip = "text")
 ```
 
 Other than a few outliers, this mainly shows that most behaviors have similarly quick response times. Further analysis could reveal more significant differences.
