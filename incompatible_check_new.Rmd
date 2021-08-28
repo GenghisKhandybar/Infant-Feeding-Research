@@ -8,33 +8,58 @@ output: html_document
 ```{r setup, include=FALSE}
 include_rejectors <- c(0, 1)
 source("shared_setup.R")
-source("reshape_data_time_event.R") #This can be commented out, but column names below must be modified.
+#source("reshape_data_time_event.R") #This can be commented out, but column names below must be modified.
 ```
 
-```{r}
+```{r checks_no_reshaping}
 b_not_possible <- data_time_event %>%
-    filter(`Pushes nipple out with tongue` == 1 & Bottle_not_in_mouth== 1) %>%
-  select(dyad_unit, id, time, `Pushes nipple out with tongue`, Bottle_not_in_mouth)
+    filter(`Pushes.nipple.out.with.tongue` == 1 & Bottle_not_in_mouth== 1) %>%
+  select(dyad_unit, dyad_set, id, time, `Pushes.nipple.out.with.tongue`, Bottle_not_in_mouth)
 
 c_not_possible <- data_time_event %>%
-    filter(`Lip compression/does not open mouth` == 1 & Bottle_in_mouth == 1) %>%
-  select(dyad_unit, id, time, `Lip compression/does not open mouth` ,Bottle_in_mouth)
+    filter(`Lip.compression.does.not.open.mouth` == 1 & Bottle_in_mouth == 1) %>%
+  select(dyad_unit, dyad_set, id, time, `Lip.compression.does.not.open.mouth` ,Bottle_in_mouth)
 
 d_not_possible <- data_time_event %>%
-    filter(`Blocks mouth with hands or feet` == 1 & Bottle_in_mouth == 1) %>%
-  select(dyad_unit, id, time, `Blocks mouth with hands or feet` , Bottle_in_mouth)
+    filter(`Blocks.mouth.with.hands.or.feet` == 1 & Bottle_in_mouth == 1) %>%
+  select(dyad_unit, dyad_set, id, time, `Blocks.mouth.with.hands.or.feet` , Bottle_in_mouth)
 
-all_incompatible <- rbind(b_not_possible, c_not_possible, d_not_possible) %>%
-  mutate(problem = case_when(
-    `Pushes nipple out with tongue` == 1 & Bottle_not_in_mouth== 1 ~ "Push Nipple Out & Bottle Not in Mouth",
-    `Lip compression/does not open mouth` == 1 & Bottle_in_mouth == 1 ~ "Lip Compression & Bottle in Mouth",
-    `Blocks mouth with hands or feet` == 1 & Bottle_in_mouth == 1 ~ "Blocks Mouth & Bottle in Mouth"
-  )) %>%
-  select(dyad_unit, id, time, problem)
+all_incompatible <- rbind(b_not_possible, c_not_possible, d_not_possible) #%>%
+  # mutate(problem = case_when(
+  #   `Pushes.nipple.out.with.tongue` == 1 & Bottle_not_in_mouth== 1 ~ "Push Nipple Out & Bottle Not in Mouth",
+  #   `Lip.compression.does.not.open.mouth` == 1 & Bottle_in_mouth == 1 ~ "Lip Compression & Bottle in Mouth",
+  #   `Blocks.mouth.with.hands.or.feet` == 1 & Bottle_in_mouth == 1 ~ "Blocks Mouth & Bottle in Mouth"
+  # )) %>%
+  #select(dyad_unit, id, time, problem)
+```
 
+
+```{r checks_reshaping}
+# b_not_possible <- data_time_event %>%
+#     filter(`Pushes nipple out with tongue` == 1 & Bottle_not_in_mouth== 1) %>%
+#   select(dyad_unit, id, time, `Pushes nipple out with tongue`, Bottle_not_in_mouth)
+# 
+# c_not_possible <- data_time_event %>%
+#     filter(`Lip compression/does not open mouth` == 1 & Bottle_in_mouth == 1) %>%
+#   select(dyad_unit, id, time, `Lip compression/does not open mouth` ,Bottle_in_mouth)
+# 
+# d_not_possible <- data_time_event %>%
+#     filter(`Blocks mouth with hands or feet` == 1 & Bottle_in_mouth == 1) %>%
+#   select(dyad_unit, id, time, `Blocks mouth with hands or feet` , Bottle_in_mouth)
+# 
+# all_incompatible <- rbind(b_not_possible, c_not_possible, d_not_possible) %>%
+#   mutate(problem = case_when(
+#     `Pushes nipple out with tongue` == 1 & Bottle_not_in_mouth== 1 ~ "Push Nipple Out & Bottle Not in Mouth",
+#     `Lip compression/does not open mouth` == 1 & Bottle_in_mouth == 1 ~ "Lip Compression & Bottle in Mouth",
+#     `Blocks mouth with hands or feet` == 1 & Bottle_in_mouth == 1 ~ "Blocks Mouth & Bottle in Mouth"
+#   )) %>%
+#   select(dyad_unit, id, time, problem)
+```
+
+```{r end}
 
 all_incompatible <- all_incompatible %>%
-  filter(!(dyad_set == "2moB" & id == 70081)) %>%#the 2moB 70081 at 537.993 (Push Nipple Out & Bottle Not in Mouth) is okay.
+  filter(!(dyad_set == "2 months" & id == 70081)) %>%#the 2moB 70081 at 537.993 (Push Nipple Out & Bottle Not in Mouth) is okay.
   arrange(dyad_set)
 
 all_incompatible
