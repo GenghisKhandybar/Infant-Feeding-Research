@@ -145,7 +145,7 @@ point_behaviors <- data_duration %>%
   filter(Event_Type == "State point") %>%
   select(Behavior) %>%
   unique() %>%
-  pull()
+  pull() %>% as.vector()
 
 cues <- data_duration %>%
   filter(Grouped_behavior == "Infant Satiation Cues") %>%
