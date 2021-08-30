@@ -19,6 +19,8 @@ source("shared_setup.R")
 
 ## Final cues distribution
 
+Final infant cue before end of session
+
 ```{r final_cues}
 final_cue <- data_duration %>% 
   filter(dyad_unit == "Baby") %>% 
@@ -45,18 +47,17 @@ last_cue_counts <- last_cue_counts %>%
 #Plot
 
 last_cue_counts %>% 
-  ggplot(aes(y=reorder(Behavior, desc(prop_dyads)), 
+  ggplot(aes(y = Behavior, # y=reorder(Behavior, desc(prop_dyads)) 
              x=prop_dyads*100, 
              fill = dyad_set)) +
   geom_bar(position="dodge", stat="identity") +
   facet_grid(cols = vars(dyad_set)) +
   ylab("Final Satiation Cue") +
   xlab("Percent of final cues") +
-  ggtitle("Final infant cue before end of session")+ 
   theme(legend.position = "none") #The fill colors are purely aesthetic so the legend is removed.
 ```
 
-For the 2 week and 2 month feedings, droolig, spitting out milk, spitting up, as well as negative facial expressions are some of the most common final cues, meaning they are likely good indicators of satiation at those ages. While very rare in the 2 week and 2 month feedings, physical rejection by turning head or body, or pushing the bottle away become the most prevailant final satiation indicators.
+For the 2 week and 2 month feedings, drooling, spitting out milk, spitting up, as well as negative facial expressions are some of the most common final cues, meaning they are likely good indicators of satiation at those ages. While very rare in the 2 week and 2 month feedings, physical rejection by turning head or body, or pushing the bottle away become the most prevalent final satiation indicators.
 
 ## Time of final cues before the feeding ends
 
@@ -78,7 +79,9 @@ final_cue <- final_cue %>% left_join( #Adding median times to sort by
 )
 par(mfrow=c(2,1))
 
-final_cue %>% ggplot(aes(x=time_before_end, y=reorder(Behavior, med_time))) +
+final_cue %>% ggplot(aes(x=time_before_end, 
+                         y = Behavior, #y=reorder(Behavior, med_time)
+                         )) +
   geom_boxplot() + 
   facet_grid(cols = vars(dyad_set)) +
 #  xlim(0, 240) +
@@ -88,7 +91,9 @@ final_cue %>% ggplot(aes(x=time_before_end, y=reorder(Behavior, med_time))) +
           #, subtitle = "Excluding outliers above 240 seconds"
           )
 
-final_cue %>% ggplot(aes(x=fraction_before_end, y=reorder(Behavior, med_frac_time))) +
+final_cue %>% ggplot(aes(x=fraction_before_end, 
+                         y = Behavior #y=reorder(Behavior, med_frac_time))
+                     )) +
   geom_boxplot() + 
   facet_grid(cols = vars(dyad_set)) +
   #xlim(0, 240) +
@@ -141,8 +146,9 @@ last_cue_counts <- combinations %>%
   mutate(n = replace_na(n, 0)) %>% 
   left_join(n_dyads,
             on=dyad_set) %>% 
-  mutate(prop_dyads = n/n_dyads,
-         Behavior = reorder(Behavior, desc(prop_dyads))) %>% 
+  mutate(prop_dyads = n/n_dyads
+         #Behavior = reorder(Behavior, desc(prop_dyads))
+         ) %>% 
   mutate(pct_dyads = prop_dyads*100)
 
 # Table -----------
@@ -155,7 +161,7 @@ verbose_props <- last_cue_counts %>%
               values_from = prop_dyads_verbose, 
               id_cols = Behavior)
 verbose_props %>% 
-  arrange(verbose_props %>% select("6moB")) %>% 
+  arrange(verbose_props[1,]) %>% 
   kable(caption="Proportion of infants displaying each cue in the last 25% of feeding")
 
 # Plot ----------

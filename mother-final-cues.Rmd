@@ -108,7 +108,7 @@ verbose_props <- last_cue_counts %>%
               values_from = prop_dyads_verbose, 
               id_cols = Behavior)
 verbose_props %>% 
-  arrange(verbose_props %>% select("6moB")) %>% 
+  arrange(verbose_props[1,]) %>% 
   kable(caption="Proportion of mothers displaying each behavior in the last 25% of feeding")
 
 # Plot ----------

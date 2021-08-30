@@ -44,8 +44,6 @@ kmeans <- data_total_simple %>%
 
 data_total_clustered <- data_total_simple %>% 
   cbind(cluster = as.factor(kmeans$cluster))
-
-
 ```
 
 ```{r initial-summary}

@@ -9,7 +9,6 @@ output: html_document
 
 
 ```{r, include = FALSE}
-
 library(readr)
 library(dplyr)
 library(tidyr) # need devtools version ?
@@ -37,7 +36,8 @@ knitr::opts_chunk$set(echo = FALSE,
 # seq_vec(x, y) = c(x[1]:y[1], x[2]:y[2], ...)
 seq_vec <- Vectorize(seq.default, vectorize.args = c("from", "to"))
 
-dyad_set_levels <- c("2wkB", "2moB", "4moB", "6moB")
+dyad_set_levels_short <- c("2wkB", "2moB", "4moB", "6moB")
+dyad_set_levels <- c("2 weeks", "2 months", "4 months", "6 months", "9 months", "12 months")
 
 n_time_points = length(dyad_set_levels)
 
@@ -98,6 +98,8 @@ data <- read_csv("all_data.csv") %>% #Groups are added by left_join in code chun
     Position_of_Infant = as.integer(Position_of_Infant),
     time = as.double(time),
     duration = as.double(duration),
+    dyad_set = str_replace(dyad_set, "wkB", " weeks"), # Creates full age labels
+    dyad_set = str_replace(dyad_set, "moB", " months"),
     dyad_set = factor(dyad_set, levels = dyad_set_levels),
     Bottle_Rejector = replace_na(Bottle_Rejector, 0),
     Bottle_Rejector = factor(Bottle_Rejector)
@@ -257,33 +259,33 @@ Summarize total number of dyads observed at each combination of ages
 
 
 ```{r}
-data_age_summary <- data_map %>%
-  ungroup() %>%
-  mutate(across(where(is.numeric), ~round(.x + 0.1))) %>%
-  filter(!(id == "Total")) %>%
-  group_by(`2wkB`, `2moB`, `4moB`, `6moB`) %>%
-  summarize(count = n_distinct(id)) %>%
-  arrange(desc(`2wkB` + `2moB` + `4moB` +`6moB`),
-          desc(`2wkB`),
-          desc(`2moB`),
-          desc(`4moB`),
-          desc(`6moB`))
+# data_age_summary <- data_map %>%
+#   ungroup() %>%
+#   mutate(across(where(is.numeric), ~round(.x + 0.1))) %>%
+#   filter(!(id == "Total")) %>%
+#   group_by(`2 weeks`, `2 months`, `4 months`, `6 months`) %>%
+#   summarize(count = n_distinct(id)) %>%
+#   arrange(desc(`2 weeks` + `2 months` + `4 months` + `6 months`),
+#           desc(`2 weeks`),
+#           desc(`2 months`),
+#           desc(`4 months`),
+#           desc(`6 months`))
 
 ```
 
 ```{r}
 
-data_age_summary_acceptors <- data_map %>%
-  ungroup() %>%
-  mutate(across(where(is.numeric), ~trunc(.x + 0.1))) %>%
-  filter(!(id == "Total")) %>%
-  group_by(`2wkB`, `2moB`, `4moB`, `6moB`) %>%
-  summarize(count = n_distinct(id)) %>%
-  arrange(desc(`2wkB` + `2moB` + `4moB` + `6moB`),
-          desc(`2wkB`),
-          desc(`2moB`),
-          desc(`4moB`),
-          desc(`6moB`))
+# data_age_summary_acceptors <- data_map %>%
+#   ungroup() %>%
+#   mutate(across(where(is.numeric), ~trunc(.x + 0.1))) %>%
+#   filter(!(id == "Total")) %>%
+#   group_by(`2wkB`, `2moB`, `4moB`, `6moB`) %>%
+#   summarize(count = n_distinct(id)) %>%
+#   arrange(desc(`2wkB` + `2moB` + `4moB` + `6moB`),
+#           desc(`2wkB`),
+#           desc(`2moB`),
+#           desc(`4moB`),
+#           desc(`6moB`))
 
 ```
 

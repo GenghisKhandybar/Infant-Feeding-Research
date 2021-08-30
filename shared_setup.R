@@ -35,18 +35,51 @@ knitr::opts_chunk$set(echo = FALSE,
 if(!exists("include_rejectors")) #Default to only accept non-rejectors
   include_rejectors <- c(0)
 
+# Universal behavior order
+
+behavior_order <- c("Displays negative facial expression", # Subtle cues
+                    "Bites or chews nipple",
+                    "Blocks mouth with hands or feet",
+                    "Lip compression/does not open mouth" ,
+                    "Shakes head or turns head/body away",
+                    "Drools, spits out milk, spits up",
+                    "Eyes Closed",
+                    "Eyes Open",
+                    "Pushes nipple out with tongue", # Potent cues
+                    "Gags, coughs, chokes",
+                    "Leans away or arches back",
+                    "Pushes bottle away",
+                    "Crying",
+                    "Not Crying",
+                    "Bottle not in mouth", #Mom behaviors (REORDER THIS?)
+                    "Bottle in mouth",
+                    "Verbal limiting of intake",
+                    "Physical stimulation of sucking or feeding",
+                    "Looks at phone or device",
+                    "Breaks infant's suction",
+                    "Burping",
+                    "Bottle offered",
+                    "Assesses bottle contents",
+                    "Indicates feeding is over",
+                    "Verbal acknowledgement of fullness",
+                    "Verbal acknowledgement of hunger",
+                    "Verbal stimulation of sucking or feeding",
+                    "Propped bottle",
+                    "Pushes bottle into infant's mouth",
+                    "Allows infant to hold bottle")
+
 # Reading data_duration -------------------------------------------------------
 
 data_duration <- read.csv("data_duration.csv")
 
 dyad_set_levels <- data_duration %>% distinct(dyad_set) %>% pull()
+
 n_time_points = length(dyad_set_levels) # Not sure if this is used, but it's here to make sure there's no problems
 
 data_duration <- data_duration %>% 
-  mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels)) %>%
+  mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels),
+         Behavior = factor(Behavior, levels = behavior_order)) %>%
   filter(Bottle_Rejector %in% include_rejectors)
-
-attr(data_duration$Time_Relative_sf, "label") = "Seconds into feeding"
 
 # Reading data (used in descriptive-statistics-summer2020) -------------------
 
@@ -63,7 +96,8 @@ data <- read_csv("data.csv") %>%
     duration = as.double(duration),
     dyad_set = factor(dyad_set, levels = dyad_set_levels),
     Bottle_Rejector = replace_na(Bottle_Rejector, 0),
-    Bottle_Rejector = factor(Bottle_Rejector)
+    Bottle_Rejector = factor(Bottle_Rejector),
+    Behavior = factor(Behavior, levels = behavior_order)
   ) %>% 
   mutate(Behavior = replace(Behavior, Behavior == "Blocks mouth", "Blocks mouth with hands or feet")) %>% 
   filter(Bottle_Rejector %in% include_rejectors)
@@ -77,6 +111,7 @@ data_time_event <- read.csv("data_time_event.csv") %>%
 
 data_dyad_total_zeros <- read_csv("data-dyad-total-zeros.csv") %>%
   mutate(dyad_set = factor(dyad_set, levels = dyad_set_levels),
+         Behavior = factor(Behavior, levels = behavior_order),
          id = factor(id),
          Bottle_Rejector = factor(Bottle_Rejector),
          num_per_min = num_per_length * 60) %>%
@@ -110,7 +145,7 @@ point_behaviors <- data_duration %>%
   filter(Event_Type == "State point") %>%
   select(Behavior) %>%
   unique() %>%
-  pull()
+  pull() %>% as.vector()
 
 cues <- data_duration %>%
   filter(Grouped_behavior == "Infant Satiation Cues") %>%
