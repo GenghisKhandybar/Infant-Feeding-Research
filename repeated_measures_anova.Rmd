@@ -1,31 +1,17 @@
 ---
 title: "Repeated Measures ANOVA"
 author: "Jake Esprabens"
-date: "7/22/2021"
-output: html_document
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE,
-                      message = FALSE,
-                      warning = FALSE)
-```
-
-```{r echo = T, results = 'hide', message=FALSE}
-library(tidyverse)
-library(effectsize)
-```
-
-## Reading in Data
-```{r}
-# currently using data duration dataset and data time event dataset.
-# However, I still had to do some summarising
-
-data_duration <- read.csv("data_duration.csv") %>%
-  rename(ID_Number = id)
-
-data_time_event <- read.csv("data_time_event.csv") %>%
-  rename(ID_Number = id)
+include_rejectors <- c(0, 1)
+source("shared_setup.R")
 ```
 
 # Repeated measures analysis to test effects of time on:
@@ -35,11 +21,11 @@ data_time_event <- read.csv("data_time_event.csv") %>%
 ```{r}
 # data clean
 meal_duration_data <- data_duration %>%
-  group_by(ID_Number, dyad_set)%>%
+  group_by(id, dyad_set)%>%
   summarize(meal_duration = sum(duration))
 
 # anova
-meal_duration_model <- aov(data = meal_duration_data, meal_duration ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+meal_duration_model <- aov(data = meal_duration_data, meal_duration ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 # meal duration as response
 # dyad set as explanatory
 # ratio between subject and time
@@ -55,13 +41,13 @@ effectsize::eta_squared(meal_duration_model, partial = TRUE)
 ```{r}
 # Summarising
 bottle_state_count_data <- data_time_event %>%
-  group_by(ID_Number, dyad_set) %>%
+  group_by(id, dyad_set) %>%
   summarize(bim_count = sum(Bottle_in_mouth),
             bnim_count = sum(Bottle_not_in_mouth))
 
 
 bottle_state_data <- data_duration %>%
-  group_by(ID_Number, dyad_set) %>%
+  group_by(id, dyad_set) %>%
   summarize(bim_duration = sum(duration[Behavior == "Bottle in mouth"]),
             bnim_duration = sum(duration[Behavior == "Bottle not in mouth"]),
             bim_prop = sum(duration_fraction[Behavior == "Bottle in mouth"]),
@@ -70,10 +56,10 @@ bottle_state_data <- data_duration %>%
 ```
 
 
-#### Count
+### Count
 ```{r}
 # bottle in mouth (BIM)
-bim_count_model <- aov(data = bottle_state_count_data, bim_count ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+bim_count_model <- aov(data = bottle_state_count_data, bim_count ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(bim_count_model)
 
@@ -81,7 +67,7 @@ effectsize::eta_squared(bim_count_model, partial = TRUE)
 
 
 # bottle not in mouth (BNIM)
-bnim_count_model <- aov(data = bottle_state_count_data, bnim_count ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+bnim_count_model <- aov(data = bottle_state_count_data, bnim_count ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(bnim_count_model)
 
@@ -89,17 +75,17 @@ effectsize::eta_squared(bnim_count_model, partial = TRUE)
 ```
 
 
-#### Duration
+### Duration
 ```{r}
 # Bottle in mouth
-bim_dur_model <- aov(data = bottle_state_data, bim_duration ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+bim_dur_model <- aov(data = bottle_state_data, bim_duration ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(bim_dur_model)
 
 effectsize::eta_squared(bim_dur_model, partial = TRUE)
 
 # Bottle not in mouth
-bnim_dur_model <- aov(data = bottle_state_data, bnim_duration ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+bnim_dur_model <- aov(data = bottle_state_data, bnim_duration ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(bnim_dur_model)
 
@@ -107,17 +93,17 @@ effectsize::eta_squared(bnim_dur_model, partial = TRUE)
 ```
 
 
-#### Proportion
+### Proportion
 ```{r}
 # Bottle in mouth
-bim_prop_model <- aov(data = bottle_state_data, bim_prop ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+bim_prop_model <- aov(data = bottle_state_data, bim_prop ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(bim_prop_model)
 
 effectsize::eta_squared(bim_prop_model, partial = TRUE)
 
 # Bottle not in mouth
-bnim_prop_model <- aov(data = bottle_state_data, bnim_prop ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+bnim_prop_model <- aov(data = bottle_state_data, bnim_prop ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(bnim_prop_model)
 
@@ -129,10 +115,10 @@ effectsize::eta_squared(bnim_prop_model, partial = TRUE)
 
 ```{r}
 num_cues_data <- data_time_event %>%
-  group_by(ID_Number, dyad_set) %>%
+  group_by(id, dyad_set) %>%
   summarize(num_cues = sum(num_cues_at_time))
 
-num_cues_model <- aov(data = num_cues_data,num_cues ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+num_cues_model <- aov(data = num_cues_data,num_cues ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(num_cues_model)
 
@@ -143,10 +129,10 @@ effectsize::eta_squared(num_cues_model, partial = TRUE)
 
 ```{r}
 types_cues_data <- data_duration %>%
-  group_by(ID_Number, dyad_set) %>%
+  group_by(id, dyad_set) %>%
   summarize(num_types_cues = n_distinct(Behavior))
 
-types_cues_model <- aov(data = types_cues_data, num_types_cues ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+types_cues_model <- aov(data = types_cues_data, num_types_cues ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(types_cues_model)
 
@@ -158,36 +144,36 @@ effectsize::eta_squared(types_cues_model, partial = TRUE)
 ```{r}
 # Using "Eyes Closed" as sleeping
 sleeping_count_data <- data_time_event %>%
-  group_by(ID_Number, dyad_set) %>%
+  group_by(id, dyad_set) %>%
   summarize(sleeping_count = sum(Eyes.Closed))
 
 sleeping_data <- data_duration %>%
-  group_by(ID_Number, dyad_set) %>%
+  group_by(id, dyad_set) %>%
   summarize(sleeping_duration = sum(duration[Behavior == "Eyes Closed"]),
             sleeping_prop = sum(duration_fraction[Behavior == "Eyes Closed"]))
 ```
 
-#### count
+### count
 ```{r}
-sleeping_count_model <- aov(data = sleeping_count_data, sleeping_count ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+sleeping_count_model <- aov(data = sleeping_count_data, sleeping_count ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(sleeping_count_model)
 
 effectsize::eta_squared(sleeping_count_model, partial = TRUE)
 ```
 
-#### duration
+### duration
 ```{r}
-sleeping_dur_model <- aov(data = sleeping_data, sleeping_duration ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+sleeping_dur_model <- aov(data = sleeping_data, sleeping_duration ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(sleeping_dur_model)
 
 effectsize::eta_squared(sleeping_dur_model, partial = TRUE)
 ```
 
-#### proportion
+### proportion
 ```{r}
-sleeping_prop_model <- aov(data = sleeping_data, sleeping_prop ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+sleeping_prop_model <- aov(data = sleeping_data, sleeping_prop ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(sleeping_prop_model)
 
@@ -200,18 +186,18 @@ effectsize::eta_squared(sleeping_prop_model, partial = TRUE)
 ## number and duration of crying bouts (proportion of time spent crying)
 ```{r}
 crying_count_data <- data_time_event %>%
-  group_by(ID_Number, dyad_set) %>%
+  group_by(id, dyad_set) %>%
   summarize(crying_count = sum(Crying))
   
 crying_data <- data_duration %>%
-  group_by(ID_Number, dyad_set) %>%
+  group_by(id, dyad_set) %>%
   summarize(crying_duration = sum(duration[Behavior == "Crying"]),
             crying_prop = sum(duration_fraction[Behavior == "Crying"]))
 ```
 
-##### count
+### count
 ```{r}
-crying_count_model <- aov(data = crying_count_data, crying_count ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+crying_count_model <- aov(data = crying_count_data, crying_count ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(crying_count_model)
 
@@ -219,9 +205,9 @@ effectsize::eta_squared(crying_count_model, partial = TRUE)
 ```
 
 
-#### duration
+### duration
 ```{r}
-crying_dur_model <- aov(data = crying_data, crying_duration ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+crying_dur_model <- aov(data = crying_data, crying_duration ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(crying_dur_model)
 
@@ -229,9 +215,9 @@ effectsize::eta_squared(crying_dur_model, partial = TRUE)
 ```
 
 
-#### proportion
+### proportion
 ```{r}
-crying_prop_model <- aov(data = crying_data, crying_prop ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+crying_prop_model <- aov(data = crying_data, crying_prop ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(crying_prop_model)
 
@@ -244,10 +230,10 @@ effectsize::eta_squared(crying_prop_model, partial = TRUE)
 mom_behavior_data <- data_duration %>%
   filter(Behavior != "Indicates feeding is over") %>%
   filter(dyad_unit == "Mom") %>%
-  group_by(ID_Number, dyad_set) %>%
+  group_by(id, dyad_set) %>%
   summarize(num_mom_behaviors = n())
 
-mom_behavior_model <- aov(data = mom_behavior_data, num_mom_behaviors ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+mom_behavior_model <- aov(data = mom_behavior_data, num_mom_behaviors ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(mom_behavior_model)
 
@@ -262,15 +248,15 @@ effectsize::eta_squared(mom_behavior_model, partial = TRUE)
 uninvolved_data <- data_duration %>%
   filter(Behavior == "Propped bottle" |
          Behavior == "Looks at phone or device") %>%
-  group_by(ID_Number, dyad_set) %>%
+  group_by(id, dyad_set) %>%
   summarize(num_behaviors = n(),
             duration = sum(duration))
 ```
 
-#### count
+### count
 ```{r}
 # count of these behaviors
-uninvolved_model_count <- aov(data = uninvolved_data, num_behaviors ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+uninvolved_model_count <- aov(data = uninvolved_data, num_behaviors ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(uninvolved_model_count)
 
@@ -278,10 +264,10 @@ effectsize::eta_squared(uninvolved_model_count, partial = TRUE)
 ```
 
 
-#### duration
+### duration
 ```{r}
 # duration of these behaviors
-uninvolved_model_duration <- aov(data = uninvolved_data, duration ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+uninvolved_model_duration <- aov(data = uninvolved_data, duration ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(uninvolved_model_duration)
 
@@ -297,15 +283,15 @@ effectsize::eta_squared(uninvolved_model_duration, partial = TRUE)
 responsive_data <- data_duration %>%
   filter(Behavior == "Burping" |
          Behavior == "Allows infant to hold bottle") %>%
-  group_by(ID_Number, dyad_set) %>%
+  group_by(id, dyad_set) %>%
   summarize(num_behaviors = n(),
             duration = sum(duration))
 ```
 
-#### count
+### count
 ```{r}
 # count of these behaviors
-resp_model_count <- aov(data = responsive_data, num_behaviors ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+resp_model_count <- aov(data = responsive_data, num_behaviors ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(resp_model_count)
 
@@ -313,10 +299,10 @@ effectsize::eta_squared(resp_model_count, partial = TRUE)
 ```
 
 
-#### duration
+### duration
 ```{r}
 # duration of these behaviors
-resp_model_duration <- aov(data = responsive_data, duration ~ factor(dyad_set) + Error(factor(ID_Number)/factor(dyad_set))) 
+resp_model_duration <- aov(data = responsive_data, duration ~ factor(dyad_set) + Error(factor(id)/factor(dyad_set))) 
 
 summary(resp_model_duration)
 
