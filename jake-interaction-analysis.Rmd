@@ -315,9 +315,6 @@ bottle_offers %>%
 # interaction_data %>%
 #   filter(id == 70346) %>%
 #   select(Behavior,time,dyad_set,id)
-
-interaction_data2 %>%
-  filter(Behavior == "Indicates feeding is over")
 ```
 
 
