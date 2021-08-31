@@ -51,22 +51,24 @@ behavior_order <- c("Displays negative facial expression", # Subtle cues
                     "Pushes bottle away",
                     "Crying",
                     "Not Crying",
-                    "Bottle not in mouth", #Mom behaviors (REORDER THIS?)
-                    "Bottle in mouth",
-                    "Verbal limiting of intake",
-                    "Physical stimulation of sucking or feeding",
-                    "Looks at phone or device",
-                    "Breaks infant's suction",
-                    "Burping",
-                    "Bottle offered",
-                    "Assesses bottle contents",
-                    "Indicates feeding is over",
+                    "Verbal acknowledgement of hunger", #Mom behaviors
                     "Verbal acknowledgement of fullness",
-                    "Verbal acknowledgement of hunger",
-                    "Verbal stimulation of sucking or feeding",
-                    "Propped bottle",
+                    "Allows infant to hold bottle",
+                    "Burping",
+                    "Bottle not in mouth",
+                    "Indicates feeding is over",
+                    "Assesses bottle contents", # Controlling behaviors
                     "Pushes bottle into infant's mouth",
-                    "Allows infant to hold bottle")
+                    "Verbal stimulation of sucking or feeding",
+                    "Physical stimulation of sucking or feeding",
+                    "Breaks infant's suction",
+                    "Verbal limiting of intake",
+                    
+                    "Bottle in mouth", # Other mom behaviors (order not listed)
+                    "Bottle offered",
+                    "Looks at phone or device",
+                    "Propped bottle"
+                    )
 
 # Reading data_duration -------------------------------------------------------
 
