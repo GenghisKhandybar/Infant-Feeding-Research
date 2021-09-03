@@ -54,7 +54,7 @@ behavior_codebook <- read_csv("behavior_codebook.csv")  %>% #New behavior codebo
 
 behaviors <- as.character(behavior_codebook$Behavior)
 names(behaviors) <- behavior_codebook$Grouped_behavior
-# 
+
 # behaviors_wide <- as.character(behavior_codebook$Behavior)
 # names(behaviors_wide) <- behavior_codebook$Wide_group
 # 
@@ -83,52 +83,52 @@ Excel files have already been cleaned and combined into one file.
 6moB Bottle rejector not available yet; make all non-rejectors for now.
 
 ```{r, read-data, include = FALSE}
-data <- read_csv("all_data.csv") %>% #Groups are added by left_join in code chunk below.
-  # mutate(Grouped_behavior = fct_recode(Behavior, !!!behaviors),
-  #        Wide_grouped_behavior = fct_recode(Behavior, !!!behaviors_wide),
-  #        Narrow_grouped_behavior = fct_recode(Behavior, !!!behaviors_narrow)
-  #        ) %>%
-  rename("id" = "ID_Number",
-         "coder_id" = "Coder") %>%
-  mutate(
-    Time_Relative_sf = as.double(Time_Relative_sf),
-    Duration_sf = as.double(Duration_sf),
-    Comment = as.logical(Comment),
-    id = factor(id),
-    Position_of_Infant = as.integer(Position_of_Infant),
-    time = as.double(time),
-    duration = as.double(duration),
-    dyad_set = str_replace(dyad_set, "wkB", " weeks"), # Creates full age labels
-    dyad_set = str_replace(dyad_set, "moB", " months"),
-    dyad_set = factor(dyad_set, levels = dyad_set_levels),
-    Bottle_Rejector = replace_na(Bottle_Rejector, 0),
-    Bottle_Rejector = factor(Bottle_Rejector)
-  )
+data <- read_csv("all_data.csv") #%>% #Groups are added by left_join in code chunk below.
+  # # mutate(Grouped_behavior = fct_recode(Behavior, !!!behaviors),
+  # #        Wide_grouped_behavior = fct_recode(Behavior, !!!behaviors_wide),
+  # #        Narrow_grouped_behavior = fct_recode(Behavior, !!!behaviors_narrow)
+  # #        ) %>%
+  # rename("id" = "ID_Number",
+  #        "coder_id" = "Coder") %>%
+  # mutate(
+  #   Time_Relative_sf = as.double(Time_Relative_sf),
+  #   Duration_sf = as.double(Duration_sf),
+  #   Comment = as.logical(Comment),
+  #   id = factor(id),
+  #   Position_of_Infant = as.integer(Position_of_Infant),
+  #   time = as.double(time),
+  #   duration = as.double(duration),
+  #   dyad_set = str_replace(dyad_set, "wkB", " weeks"), # Creates full age labels
+  #   dyad_set = str_replace(dyad_set, "moB", " months"),
+  #   dyad_set = factor(dyad_set, levels = dyad_set_levels),
+  #   Bottle_Rejector = replace_na(Bottle_Rejector, 0),
+  #   Bottle_Rejector = factor(Bottle_Rejector)
+  # )
 ```
 
 
 ```{r data_update}
 behaviors <- data %>%
   select(Behavior) %>%
-  unique() %>% 
+  unique() %>%
   mutate(Behavior = replace(Behavior, Behavior == "Blocks mouth", "Blocks mouth with hands or feet"))
 
 behaviors <- left_join(behaviors,
-                       behavior_codebook %>% 
+                       behavior_codebook %>%
                          select(-Event_Type, -Event_Type)
 )
 
-data <- data %>%
-  mutate(Behavior = replace(Behavior,
-                            Behavior == "Blocks mouth",
-                            "Blocks mouth with hands or feet")) %>%
-  left_join(behavior_codebook%>% 
-                         select(-Event_Type, -dyad_unit)
-            , by=c("Behavior"))
-
-write.csv(data,
-  "data.csv",
-  row.names=FALSE)
+# data <- data %>%
+#   mutate(Behavior = replace(Behavior,
+#                             Behavior == "Blocks mouth",
+#                             "Blocks mouth with hands or feet")) %>%
+#   left_join(behavior_codebook%>%
+#                          select(-Event_Type, -dyad_unit)
+#             , by=c("Behavior"))
+# 
+# write.csv(data,
+#   "data.csv",
+#   row.names=FALSE)
 ```
 
 Add columns for end time of each behavior, video length, and start/end/duration as fraction of video length.
@@ -620,8 +620,8 @@ data_dyad_total_time_split_zeros <-
   left_join(expand_grid(data_ids, Behavior = behaviors, time_split = 1:n_time_splits),
             data_dyad_total_time_split %>%
               select_if(names(.) %in% c("dyad_set", "id", "Behavior", "time_split", "dyad_unit") |
-                          sapply(., is.numeric))%>% 
-              mutate(id = as.factor(id)),
+                          sapply(., is.numeric)),
+              # mutate(id = as.factor(id)),
             by = c("dyad_set", "id", "Behavior", "time_split")) %>%
   mutate(
     across(where(is.numeric), ~replace_na(.x, 0))
@@ -635,3 +635,4 @@ write.csv(data_dyad_total_time_split_zeros,
           row.names = FALSE)
 
 ```
+

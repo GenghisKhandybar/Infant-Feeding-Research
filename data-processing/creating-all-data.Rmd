@@ -23,7 +23,63 @@ data_6mo <- read_csv("data-6moB.csv")
 ```{r}
 all_data <- rbind(data_2wk, data_2mo, data_4mo, data_6mo) 
 
+# Vectorized sequence function
+# seq_vec(x, y) = c(x[1]:y[1], x[2]:y[2], ...)
+seq_vec <- Vectorize(seq.default, vectorize.args = c("from", "to"))
 
+dyad_set_levels <- c("2 weeks", "2 months", "4 months", "6 months", "9 months", "12 months")
+
+
+behavior_codebook <- read_csv("behavior_codebook.csv")  %>% #New behavior codebook has narrow and wide groupings.
+  rename(Grouped_behavior = Behavior_group)
+
+behaviors <- as.character(behavior_codebook$Behavior)
+names(behaviors) <- behavior_codebook$Grouped_behavior
+
+
+all_data <- all_data %>%
+  rename("id" = "ID_Number",
+         "coder_id" = "Coder") %>%
+  mutate(
+    Time_Relative_sf = as.double(Time_Relative_sf),
+    Duration_sf = as.double(Duration_sf),
+    Comment = as.logical(Comment),
+    id = factor(id),
+    Position_of_Infant = as.integer(Position_of_Infant),
+    time = as.double(time),
+    duration = as.double(duration),
+    dyad_set = str_replace(dyad_set, "wkB", " weeks"), # Creates full age labels
+    dyad_set = str_replace(dyad_set, "moB", " months"),
+    dyad_set = factor(dyad_set, levels = dyad_set_levels),
+    Bottle_Rejector = replace_na(Bottle_Rejector, 0),
+    Bottle_Rejector = factor(Bottle_Rejector)
+  )
+
+
+behaviors <- all_data %>%
+  select(Behavior) %>%
+  unique() %>% 
+  mutate(Behavior = replace(Behavior, Behavior == "Blocks mouth", "Blocks mouth with hands or feet"))
+
+behaviors <- left_join(behaviors,
+                       behavior_codebook %>% 
+                         select(-Event_Type, -Event_Type)
+)
+
+all_data <- all_data %>%
+  mutate(Behavior = replace(Behavior,
+                            Behavior == "Blocks mouth",
+                            "Blocks mouth with hands or feet")) %>%
+  left_join(behavior_codebook%>% 
+                         select(-Event_Type, -dyad_unit)
+            , by=c("Behavior"))
+
+all_data %>%
+  filter(Behavior == "Displays negative facial expression")
+```
+
+
+```{r}
 write.csv(all_data, "./all_data.csv", row.names = FALSE)
 ```
 

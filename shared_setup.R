@@ -85,7 +85,7 @@ data_duration <- data_duration %>%
 
 # Reading data (used in descriptive-statistics-summer2020) -------------------
 
-data <- read_csv("data.csv") %>% 
+data <- read_csv("all_data.csv") %>% 
   # rename("id" = "ID_Number",
   #        "coder_id" = "Coder") %>%
   mutate(
