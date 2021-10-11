@@ -1,0 +1,32 @@
+---
+title: "descriptive_stats_feeding"
+author: "William"
+date: "6/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+# install.packages("tidyverse")
+```
+
+
+```{r}
+feeding <- read.csv("all-data.csv")
+```
+
+```{r}
+total_times <- feeding %>%
+  group_by(id, dyad_set) %>% 
+  summarize(total_time = max(time))
+
+feeding_times <- merge(feeding, total_times, on=c(id, dyad_set))
+feeding_times <- feeding_times %>% mutate(time_prop = Time_Relative_sf/total_time)
+
+feeding_times %>% ggplot(x=time_prop)
+```
+

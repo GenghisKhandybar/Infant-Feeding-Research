@@ -1,0 +1,2666 @@
+---
+title: 'Bottle Feeding: Descriptive Statistics'
+author: "Kevin Ross"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+
+<!-- # Setup -->
+
+```{r, include = FALSE}
+
+library(readr)
+library(dplyr)
+library(tidyr) # need devtools version ?
+library(tibble)
+library(ggplot2)
+library(GGally)
+library(stringr)
+library(purrr)
+library(forcats)
+library(knitr)
+library(purrr)
+library(ggpubr)
+library(cowplot)
+
+library(gifski)
+library(gganimate)
+# devtools::install_github('haleyjeppson/ggmosaic')
+library(ggmosaic)
+
+
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE,
+                      warning = FALSE)
+
+# Vectorized sequence function
+# seq_vec(x, y) = c(x[1]:y[1], x[2]:y[2], ...)
+seq_vec <- Vectorize(seq.default, vectorize.args = c("from", "to"))
+
+
+
+```
+
+
+```{r}
+
+behavior_codebook <- read_csv("behavior_codebook.csv")
+behaviors <- as.character(behavior_codebook$Behavior)
+names(behaviors) <- behavior_codebook$Behavior_group
+
+state_behaviors <- behavior_codebook %>%
+  filter(Event_Type == "State") %>%
+  select(Behavior) %>%
+  pull()
+
+point_behaviors <- behavior_codebook %>%
+  filter(Event_Type == "Point") %>%
+  select(Behavior) %>%
+  pull()
+
+cues <- behavior_codebook %>%
+  filter(Behavior_group == "Infant Satiation Cues") %>%
+  select(Behavior) %>%
+  pull()
+
+state_point_duration <- 0.00001 # for easier coding, treat state points as start/stop
+
+```
+
+<!-- # Data  -->
+
+<!-- # Read data (already processed in other files) -->
+
+```{r}
+# data <- setdiff(dir(pattern = "*.csv"),
+#                 "behavior_codebook.csv") %>%
+#   map_dfr(read_csv, col_types = cols(.default = "c")) %>%
+#   mutate(dyad_set = fct_relevel(dyad_set, "2wkB", "2moB", "4moB")) %>% 
+
+data <- read_csv("all_data.csv") %>%
+  mutate(Grouped_behavior = fct_recode(Behavior, !!!behaviors)) %>%
+  rename("id" = "ID_Number",
+         "coder_id" = "Coder") %>%
+  mutate(
+    Time_Relative_sf = as.double(Time_Relative_sf),
+    Duration_sf = as.double(Duration_sf),
+    Comment = as.logical(Comment),
+    id = as.integer(id),
+    Position_of_Infant = as.integer(Position_of_Infant),
+    time = as.double(time),
+    duration = as.double(duration)
+  )
+
+n_dyads <- data %>%
+  group_by(dyad_set) %>%
+  summarize(n = n_distinct(id))
+```
+
+<!-- Find Bottle state at each time: probably an easier/better way to do -->
+
+```{r}
+bottle_states <- data %>%
+  filter(str_detect(Behavior, "^Bottle")) %>%
+  pull() %>%
+  unique()
+
+create_state_path <- function(x) {
+  
+  y <- rep(0, length(x))
+  start_rows <- which(x == "State start")
+  stop_rows <- which(x == "State stop") - 1
+  state_rows <- unlist(seq_vec(from = start_rows, to = stop_rows))
+  y[state_rows] <- 1
+  as.numeric(y)
+  
+}
+
+data <- data %>%
+  arrange(dyad_set, id, time, desc(Event_Type))
+
+for (l in bottle_states) {
+  
+  x = ifelse(data$Behavior == l, data$Event_Type, NA)
+  y = create_state_path(x)
+  data <- data %>%
+    add_column(!!l := y)
+  
+}
+
+bottle_state_code = max.col(data %>%
+                              select(starts_with("Bottle "))) *
+  (data %>% mutate(bottle_sum = rowSums(across(starts_with("Bottle ")))) %>% pull(bottle_sum) > 0)
+bottle_state_code[bottle_state_code == 0] <- NA
+
+data <- data %>%
+  mutate(Bottle_state = names(data %>% select(starts_with("Bottle ")))[bottle_state_code]) %>%
+  select(-starts_with("Bottle "))
+
+# # Check 
+# data %>%
+#   filter(Bottle_state)) %>%
+#   group_by(Behavior) %>%
+#   count(Event_Type)
+
+```
+
+
+
+
+
+
+<!-- Questions - delete when answered -->
+
+<!-- - Point behaviors versus state behaviors. When do point behaviors happen? Before/during/after. For each point behavior time, look up what other behaviors are happening at that time. -->
+<!-- - covariates??? -->
+<!-- - pairs of behaviors??? -->
+<!-- - transitions??? -->
+
+
+<!-- # Create new variables -->
+
+<!-- - For each state/point behavior create variables: start time, end time, duration -->
+<!-- - Measured both in clock time and in fraction of [0, 1] (0 = start, 1 = end) -->
+
+
+```{r duration-data}
+# individual instances of each behavior
+
+data_duration <- data %>%
+  mutate(end_time = time + duration) %>%
+  group_by(dyad_set, id) %>%
+  mutate(duration_fraction = duration / max(end_time),
+         start_fraction = time / max(end_time),
+         end_fraction = end_time / max(end_time),
+         video_length = max(end_time)) %>%
+  filter(Event_Type %in% c("State start", "State point"))
+
+```
+
+
+<!-- ## Reshape for time/event type -->
+
+
+
+```{asis include = FALSE, eval = FALSE}
+
+Reshape data as time/event type
+
+1. Change Crying and Eyes Closed to point behaviors instead of state behaviors
+1. Reshape data to have one row for each time (per dyad per set) at which a point behavior occurs or a state behavior starts or ends
+1. Add a column for each level of Behavior, each with binary entries (1 = behavior present at time, 0 = not)
+1. For each State Behavior (but not Point Behaviors), fill in 1s between each "State start" and "State end".
+1. After `spread`, Point Behaviors are coded as "State point" at times of occurrence, and NA at other times.  This is then recoded to 1 at times of occurrence ("State point") and 0 at other times
+
+
+
+```
+
+
+
+```{r reshape-data-time-event}
+# Function translates start/stop column to 0/1 at each time point
+
+create_state_path <- function(x){
+  y <- rep(0, length(x))
+  start_rows <- which(x == "State start")
+  stop_rows <- which(x == "State stop") - 1
+  state_rows <- unlist(seq_vec(from = start_rows, to = stop_rows))
+  y[state_rows] <- 1
+  as.numeric(y)
+}
+
+# spread to create binary column for each behavior
+# convert Crying and Eyes Closed to point behaviors first
+
+data_time_event <- data %>%
+  filter(!(Behavior %in% c("Crying", "Eyes Closed") &
+             Event_Type == "State stop")) %>%
+  mutate(Event_Type =
+           if_else(Behavior %in% c("Crying", "Eyes Closed"), "State point",
+                   Event_Type)) %>%
+  mutate(duration =
+           if_else(Behavior %in% c("Crying", "Eyes Closed"), 0,
+                   duration)) %>%
+  arrange(dyad_set, id, time, desc(Event_Type)) %>%
+  pivot_wider(names_from = Behavior,
+              values_from = Event_Type)
+              # names_repair = "unique") # made me add a names_repiar strategy.  Don't really know what this is.
+
+# Change start/stop to 1/0 and point behaviors to 1/0
+# Should be able to do the following with mutate?
+# mutate(across(any_of(state_behaviors)), create_state_path)
+
+for (l in setdiff(state_behaviors, c("Eyes Closed", "Crying"))) {
+  
+  y = create_state_path(data_time_event[, l] %>% pull())
+  data_time_event <- data_time_event %>%
+    select(-l) %>% 
+    add_column(!!l := y)
+  
+}
+
+for (l in c(point_behaviors, c("Eyes Closed", "Crying"))) {
+  
+  y = data_time_event[, l] %>% pull() %>% is.na() %>% as.numeric()
+  data_time_event <- data_time_event %>%
+    select(-l) %>% 
+    add_column(!!l := 1 - y)
+  
+}
+
+
+# Some times have multiple rows for start/stops for multiple behaviors
+# Need to collapse so only one row for each time
+# **Only keep last row for each time**
+# after all start/stops at a single time have been accounted
+
+# Adjusting times with multiple rows probably needs to be checked more thoroughly
+
+data_time_event <- data_time_event %>%
+  group_by(dyad_set, id, time) %>%
+  mutate(duration = ifelse(time == 0 & coder_id == "KJR",
+                           duration,
+                           max(duration))) %>%
+  filter(row_number() == n()) %>%
+  arrange(dyad_set, id, time) %>%
+  mutate(infant_cue = rowSums(across(any_of(cues)))) %>%
+  mutate(infant_cue = ifelse(infant_cue > 0, 1, 0)) %>%
+  group_by(dyad_set, id) %>%
+  select(dyad_set, id, dyad_unit, time, duration,
+         starts_with("Bottle"), any_of(c(state_behaviors, point_behaviors)),
+         infant_cue)
+
+
+# Add counter for each bottle state in a feeding
+
+
+data_time_event <- data_time_event %>%
+  rename_with(~ gsub(" ", "_", .x), starts_with("Bottle ")) %>%
+  mutate(Bottle_state_code =
+           1 * Bottle_not_in_mouth +
+           2 * Bottle_in_mouth +
+           3 * Bottle_offered) %>%
+  mutate(prev_Bottle_state_code =
+           dplyr::lag(Bottle_state_code, n = 1, default = NA)) %>%
+  mutate(Bottle_state_change = 
+           ifelse(is.na(prev_Bottle_state_code),
+                  1,
+                  as.numeric(!(Bottle_state_code == prev_Bottle_state_code)))) %>%
+  mutate(Bottle_state_counter = cumsum(Bottle_state_change)) %>%
+  mutate(next_time =
+           dplyr::lead(time, n = 1, default = NA)) %>%
+  mutate(time_until_next = 
+           ifelse(is.na(next_time), 0, next_time - time)) %>%
+  ungroup() %>%
+  group_by(dyad_set, id, Bottle_state_counter, Bottle_state) %>%
+  mutate(time_in_bottle_state =
+           time - min(time)) %>%
+  mutate(time_remaining_in_bottle_state =
+           max(next_time) - time) %>%
+  mutate(time_fraction_bottle_state =
+           (time - min(time)) / (max(next_time) - min(time)))
+
+
+# create a column for the cue that happens at the time
+# For now just record multiple cues as "multiple"
+
+cue_columns_only <- data_time_event %>% ungroup() %>% select(any_of(cues))
+
+data_time_event <- data_time_event %>%
+  mutate(num_cues_at_time = rowSums(across(any_of(cues)))) %>%
+  add_column(cue_at_time = colnames(cue_columns_only)[
+    apply(cue_columns_only, 1, which.max)]) %>%
+  mutate(cue_at_time = ifelse(num_cues_at_time == 0, NA, cue_at_time)) %>%
+  mutate(cue_at_time = ifelse(num_cues_at_time > 1, "multiple", cue_at_time))
+
+# exporting data_time_event dataframe
+
+write.csv(data_time_event, ".//data_time_event.csv", row.names = FALSE)
+
+
+```
+
+
+<!-- # Dyad totals -->
+
+<!-- - Number of occurrences of each behavior for each dyad in each set, and -->
+<!-- - Number of occurrences divided by video length -->
+
+```{r dyad-totals}
+
+data_dyad_total <- data_duration %>%
+  group_by(dyad_set, id, Behavior, dyad_unit) %>%
+  summarize(Event_Type = first(Event_Type),
+            total_fraction = sum(duration_fraction), 
+            total_duration = sum(duration),
+            num_occurrences = n(),
+            video_length = max(video_length)) %>%
+  mutate(num_per_length = num_occurrences / video_length)
+
+# State behaviors only
+
+data_dyad_total_states <- data_dyad_total %>%
+  filter(Event_Type == "State start")
+
+data_dyad_total_points <- data_dyad_total %>%
+  filter(Event_Type == "State point")
+```
+
+<!-- Jake's Tasks -->
+
+
+<!-- Task 1. -->
+<!-- Find instances where -->
+<!-- a. pushes nipple out + bottle offered or bottle not in mouth -->
+<!-- b. pushes nipple out + bottle not in mouth -->
+<!-- c. lip compression + bottle in mouth -->
+<!-- d. blocks mouth with hands + bottle in mouth -->
+
+```{r}
+# a_not_possible <- data_time_event %>%
+#   filter(`Pushes nipple out with tongue` == 1 & Bottle_offered == 1) %>%
+#         #| `Pushes nipple out with tongue` == 1 & Bottle_not_in_mouth== 1) %>%
+#   select(dyad_unit, id, time, `Pushes nipple out with tongue`, Bottle_offered) #, Bottle_not_in_mouth)
+
+b_not_possible <- data_time_event %>%
+    filter(`Pushes nipple out with tongue` == 1 & Bottle_not_in_mouth== 1) %>%
+  select(dyad_unit, id, time, `Pushes nipple out with tongue`, Bottle_not_in_mouth)
+
+c_not_possible <- data_time_event %>%
+    filter(`Lip compression/does not open mouth` == 1 & Bottle_in_mouth == 1) %>%
+  select(dyad_unit, id, time, `Lip compression/does not open mouth` ,Bottle_in_mouth)
+
+d_not_possible <- data_time_event %>%
+    filter(`Blocks mouth with hands` == 1 & Bottle_in_mouth == 1) %>%
+  select(dyad_unit, id, time, `Blocks mouth with hands` , Bottle_in_mouth)
+
+all_impossible <- rbind(b_not_possible, c_not_possible, d_not_possible) %>%
+  mutate(problem = case_when(
+    # `Pushes nipple out with tongue` == 1 & Bottle_offered == 1 ~ "Push Nipple Out & Bottle Offered",
+    `Pushes nipple out with tongue` == 1 & Bottle_not_in_mouth== 1 ~ "Push Nipple Out & Bottle Not in Mouth",
+    `Lip compression/does not open mouth` == 1 & Bottle_in_mouth == 1 ~ "Lip Compression & Bottle in Mouth",
+    `Blocks mouth with hands` == 1 & Bottle_in_mouth == 1 ~ "Blocks Mouth with Hands & Bottle in Mouth"
+  )) %>%
+  select(dyad_unit, id, time, problem)
+
+
+all_impossible
+
+# write.csv(all_impossible, "C:\\Users\\espra\\OneDrive\\Documents\\CP\\Research - Infant Obestity\\updated_problemed_IDs_2mo_2wk.csv", row.names = FALSE)
+
+# I believe the 2moB 70081 at 537.993 (Push Nipple Out & Bottle Not in Mouth) is okay.
+# I think the 4moB 70468 at 42.2747 (Push Nipple Out & Bottle Not in Mouth) is new.  Check this one.
+```
+
+
+
+
+
+
+
+<!-- <!-- ## Grouped behaviors --> -->
+
+<!-- ```{r dyad-grouped} -->
+
+<!-- data_dyad_grouped <- data_duration %>% -->
+<!--   group_by(dyad_set, id, Grouped_behavior, dyad_unit) %>% -->
+<!--   summarize(Event_Type = first(Event_Type), -->
+<!--             total_fraction = sum(duration_fraction),  -->
+<!--             total_duration = sum(duration), -->
+<!--             num_occurrences = n(), -->
+<!--             video_length = max(video_length)) %>% -->
+<!--   mutate(num_per_length = num_occurrences / video_length) -->
+
+<!-- # State behaviors only -->
+
+<!-- data_dyad_grouped_states <- data_dyad_grouped %>% -->
+<!--   filter(Event_Type == "State start") -->
+
+<!-- data_dyad_grouped_points <- data_dyad_grouped %>% -->
+<!--   filter(Event_Type == "State point") -->
+
+<!-- ``` -->
+
+
+<!-- # Timeline plot for all dyads -->
+
+
+<!-- ```{r timeline-plot-data, fig.width = 10} -->
+
+<!-- data_duration_plot <- data_duration %>% -->
+<!--   select(dyad_set, id, dyad_unit, Behavior, Event_Type, time, end_time) %>%#, -->
+<!-- #         start_fraction, end_fraction, end_time) %>% -->
+<!--   mutate(Behavior = fct_relevel(Behavior, sort)) %>% -->
+<!--   mutate(row_id = row_number()) %>% -->
+<!--   gather("state", "time", c(time, end_time)) %>% -->
+<!--   arrange(dyad_set, id, Behavior, time) -->
+
+<!-- ``` -->
+
+
+<!-- animation.hook="ffmpeg" -->
+
+<!-- fig.show='animate' -->
+
+<!-- ```{r, timeline-gif, animation.hook="gifski", interval=2.5, fig.width=10, cache = TRUE} -->
+
+<!-- ids = sort(unique(data$id)) -->
+
+<!-- for (id_to_view in ids) { -->
+<!--   p <- ggplot(data_duration_plot %>% -->
+<!--                 filter(id == id_to_view) %>% -->
+<!--                 filter(Event_Type == "State start"), -->
+<!--               aes(x = time, -->
+<!--                   y = Behavior, -->
+<!--                   group = row_id, -->
+<!--                   color = dyad_unit)) +  -->
+<!--     geom_line(size = 3) + -->
+<!--     ggtitle(paste("dyad", id_to_view)) + -->
+<!--     geom_point(data = data_duration_plot %>% -->
+<!--                  filter(id == id_to_view) %>% -->
+<!--                  filter(Event_Type == "State point"), -->
+<!--                aes(x = time, color = dyad_unit)) + -->
+<!--     xlab("Time (sec)") + -->
+<!--     ylab("Behavior") + -->
+<!--     facet_wrap(vars(dyad_set)) -->
+
+<!--   plot(p) -->
+<!-- } -->
+<!-- ``` -->
+
+
+
+<!-- # State behaviors -->
+
+<!-- ## Time as fraction -->
+
+
+<!-- ```{r plot-fraction-states} -->
+
+<!-- ggplot(data_dyad_total_states, -->
+<!--        aes(x = fct_reorder(Behavior, total_fraction, median, .desc = TRUE), -->
+<!--            y = total_fraction)) + -->
+<!--   geom_boxplot(aes(color = dyad_unit)) + -->
+<!--   coord_flip() + -->
+<!--   xlab("State behavior") + -->
+<!--   ylab("Total duration of occurrence in [0, 1]") + -->
+<!--   facet_wrap(~dyad_set) -->
+<!-- # + -->
+<!-- #  geom_jitter(aes(color = dyad_unit)) -->
+
+<!-- ``` -->
+
+<!-- ```{r plot-fraction-bottle} -->
+
+<!-- Bottle_positions <- c("Bottle in mouth", -->
+<!--                       "Bottle not in mouth", -->
+<!--                       "Bottle offered") -->
+
+<!-- ggplot(data_dyad_total_states %>% -->
+<!--          filter(Behavior %in% Bottle_positions), -->
+<!--        aes(total_fraction, fill = Behavior)) + -->
+<!--   geom_histogram(aes(y = ..density..)) + -->
+<!--   xlab("Total duration ([0, 1])") + -->
+<!--   facet_grid(dyad_set ~ .) -->
+<!-- # + -->
+<!-- #  geom_jitter(aes(color = dyad_unit)) -->
+
+<!-- ``` -->
+
+<!-- ```{r summary-fraction, message = FALSE} -->
+
+<!-- data_dyad_total_states %>% -->
+<!--   group_by(dyad_set, Behavior) %>% -->
+<!--   summarize_at(vars(total_fraction), -->
+<!--                list(~length(.), ~mean(.), ~sd(.), ~min(.), -->
+<!--                     ~median(.), ~max(.))) %>% -->
+<!--   kable(digits = 3) -->
+
+<!-- ``` -->
+
+
+<!-- ```{r, eval = FALSE, include = FALSE} -->
+
+<!-- ggplot(data_dyad_total_states, -->
+<!--        aes(total_fraction, fill = Behavior)) + -->
+<!--   geom_histogram(aes(y = ..density..)) + -->
+<!--   xlab("Total duration ([0, 1])") + -->
+<!--   facet_grid(dyad_set ~ .) -->
+
+<!-- ``` -->
+
+<!-- ## Time as seconds -->
+
+<!-- ```{r plot-duration} -->
+
+<!-- ggplot(data_dyad_total_states, -->
+<!--        aes(x = fct_reorder(Behavior, total_duration, median, .desc = TRUE), -->
+<!--            y = total_duration)) + -->
+<!--   geom_boxplot(aes(color = dyad_unit)) + -->
+<!--   coord_flip() + -->
+<!--   xlab("State behavior") + -->
+<!--   ylab("Total duration of occurrence (sec)") + -->
+<!--   facet_wrap(~dyad_set) -->
+<!-- # + -->
+<!-- #  geom_jitter(aes(color = dyad_unit)) -->
+
+
+<!-- ``` -->
+
+<!-- ```{r} -->
+
+<!-- ggplot(data_dyad_total_states %>% -->
+<!--          filter(Behavior %in% Bottle_positions), -->
+<!--        aes(total_duration, fill = Behavior)) + -->
+<!--   geom_histogram(aes(y = ..density..)) + -->
+<!--   xlab("Total duration of occurrence (sec)") + -->
+<!--   facet_grid(dyad_set ~ .) -->
+<!-- # + -->
+<!-- #  geom_jitter(aes(color = dyad_unit)) -->
+<!-- ``` -->
+
+
+<!-- ```{r summary-duration, message = FALSE} -->
+
+<!-- data_dyad_total_states %>% -->
+<!--   group_by(dyad_set, Behavior) %>% -->
+<!--   summarize_at(vars(total_duration), -->
+<!--                list(~length(.), ~mean(.), ~sd(.), -->
+<!--                     ~min(.), ~median(.), ~max(.))) %>% -->
+<!--   kable(digits = 1) -->
+
+<!-- ``` -->
+
+
+
+<!-- ```{r, eval = FALSE, include = FALSE} -->
+
+<!-- ggplot(data_dyad_total_states, -->
+<!--        aes(total_duration, fill = Behavior)) + -->
+<!--   geom_histogram(aes(y = ..density..)) + -->
+<!--   xlab("Total duration (sec)") + -->
+<!--   facet_grid(dyad_set ~ .) -->
+
+<!-- ``` -->
+
+
+
+<!-- # Point behaviors: counts -->
+
+
+
+<!-- ```{r} -->
+
+<!-- ggplot(data_dyad_total_points, -->
+<!--        aes(x = fct_reorder(Behavior, num_occurrences), -->
+<!--            y = num_occurrences)) + -->
+<!--   geom_boxplot(aes(color = dyad_unit)) + -->
+<!--   coord_flip() + -->
+<!--   xlab("State point") + -->
+<!--   ylab("Number of occurrences (per dyad)") + -->
+<!--   facet_grid(~ dyad_set) -->
+<!-- # + -->
+<!-- #  geom_jitter() -->
+
+<!-- ``` -->
+
+
+
+<!-- NEED TO FIX THIS TO INCLUDE 0 COUNTS -->
+
+<!-- ```{r} -->
+
+<!-- data_dyad_total_points %>% -->
+<!--   ungroup() %>% -->
+<!--   group_by(dyad_set, Behavior) %>% -->
+<!--   summarize_at(vars(num_occurrences), -->
+<!--                list(~sum(.), ~mean(.), ~sd(.), -->
+<!--                     ~min(.), ~median(.), ~max(.))) %>% -->
+<!--   arrange(dyad_set, desc(sum)) %>% -->
+<!--   kable(digits = 1) -->
+
+
+<!-- ``` -->
+
+
+<!-- ## Grouped behaviors -->
+
+
+
+<!-- ```{r} -->
+
+<!-- ggplot(data_dyad_grouped_points %>% -->
+<!--          filter(dyad_unit == "Mom"), -->
+<!--        aes(x = fct_reorder(Grouped_behavior, num_occurrences), -->
+<!--            y = num_occurrences)) + -->
+<!--   geom_boxplot(aes(color = dyad_unit)) + -->
+<!--   coord_flip() + -->
+<!--   xlab("State point") + -->
+<!--   ylab("Number of occurrences (per dyad)") + -->
+<!--   facet_wrap(~ dyad_set) -->
+<!-- # + -->
+<!-- #  geom_jitter() -->
+
+<!-- ``` -->
+
+
+
+
+
+<!-- ```{r} -->
+
+<!-- data_dyad_grouped_points %>% -->
+<!--   ungroup() %>% -->
+<!--   group_by(dyad_set, Grouped_behavior) %>% -->
+<!--   summarize_at(vars(num_occurrences), -->
+<!--                list(~sum(.), ~mean(.), ~sd(.), -->
+<!--                     ~min(.), ~median(.), ~max(.))) %>% -->
+<!--   arrange(dyad_set, desc(sum)) %>% -->
+<!--   kable(digits = 1) -->
+
+
+<!-- ``` -->
+
+
+
+
+<!-- # Point behaviors: count per video length -->
+
+
+
+<!-- ```{r} -->
+
+<!-- ggplot(data_dyad_total_points, -->
+<!--        aes(x = fct_reorder(Behavior, num_per_length), -->
+<!--            y = num_per_length)) + -->
+<!--   geom_boxplot(aes(color = dyad_unit)) + -->
+<!--   coord_flip() + -->
+<!--   xlab("State point") + -->
+<!--   ylab("Number of occurrences / video length (per dyad)") + -->
+<!--   facet_wrap(~ dyad_set) -->
+<!-- # + -->
+<!-- #  geom_jitter() -->
+
+<!-- ``` -->
+
+
+
+
+
+<!-- ```{r} -->
+
+<!-- data_dyad_total_points %>% -->
+<!--   ungroup() %>% -->
+<!--   group_by(dyad_set, Behavior) %>% -->
+<!--   summarize_at(vars(num_per_length), -->
+<!--                list(~sum(.), ~mean(.), ~sd(.), -->
+<!--                     ~min(.), ~median(.), ~max(.))) %>% -->
+<!--   arrange(dyad_set, desc(sum)) %>% -->
+<!--   kable(digits = 4) -->
+
+
+<!-- ``` -->
+
+<!-- ## Grouped behaviors -->
+
+
+<!-- ```{r} -->
+
+<!-- ggplot(data_dyad_grouped_points %>% -->
+<!--          filter(dyad_unit == "Mom"), -->
+<!--        aes(x = fct_reorder(Grouped_behavior, num_per_length), -->
+<!--            y = num_per_length)) + -->
+<!--   geom_boxplot(aes(color = dyad_unit)) + -->
+<!--   coord_flip() + -->
+<!--   xlab("State point") + -->
+<!--   ylab("Number of occurrences / video length (per dyad)") + -->
+<!--   facet_wrap(~ dyad_set) -->
+<!-- # + -->
+<!-- #  geom_jitter() -->
+
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+
+<!-- data_dyad_grouped_points %>% -->
+<!--   ungroup() %>% -->
+<!--   group_by(dyad_set, Grouped_behavior) %>% -->
+<!--   summarize_at(vars(num_per_length), -->
+<!--                list(~sum(.), ~mean(.), ~sd(.), -->
+<!--                     ~min(.), ~median(.), ~max(.))) %>% -->
+<!--   arrange(dyad_set, desc(sum)) %>% -->
+<!--   kable(digits = 4) -->
+
+
+<!-- ``` -->
+
+<!-- # Point behaviors: time of occurrence -->
+
+<!-- ```{r} -->
+
+<!-- point_times <- data_duration %>% -->
+<!--   filter(Event_Type == "State point") %>% -->
+<!--   group_by(id, dyad_set, dyad_unit, Behavior) -->
+
+<!-- ggplot(point_times, -->
+<!--        aes(x = fct_reorder(Behavior, start_fraction, median, .desc = TRUE), -->
+<!--                        y = start_fraction)) + -->
+<!--   geom_boxplot(aes(color = dyad_unit)) + -->
+<!--   coord_flip() + -->
+<!--   xlab("Point behavior") + -->
+<!--   ylab("Time of occurrence in [0, 1]") + -->
+<!--   facet_wrap(~ dyad_set) -->
+
+<!-- ``` -->
+
+<!-- ## Grouped behaviors -->
+
+<!-- ```{r} -->
+
+<!-- point_times <- data_duration %>% -->
+<!--   filter(Event_Type == "State point") %>% -->
+<!--   group_by(id, dyad_set, dyad_unit, Grouped_behavior) -->
+
+<!-- ggplot(point_times, -->
+<!--        aes(x = fct_reorder(Grouped_behavior, start_fraction, median, .desc = TRUE), -->
+<!--                        y = start_fraction)) + -->
+<!--   geom_boxplot(aes(color = dyad_unit)) + -->
+<!--   coord_flip() + -->
+<!--   xlab("Point behavior group") + -->
+<!--   ylab("Time of occurrence in [0, 1]") + -->
+<!--   facet_wrap(~ dyad_set) -->
+
+<!-- ``` -->
+
+<!-- # Point behaviors: Mom vs Baby total counts -->
+
+<!-- ```{r} -->
+
+<!-- dyad_unit_total_points <- data_dyad_total_points %>% -->
+<!--   ungroup() %>% -->
+<!--   group_by(dyad_set, id, dyad_unit) %>% -->
+<!--   summarize(total_point_count = sum(num_occurrences)) %>% -->
+<!--   pivot_wider(names_from = dyad_unit, -->
+<!--               values_from = total_point_count) -->
+
+
+<!-- ggplot(dyad_unit_total_points, -->
+<!--        aes(x = Baby, y = Mom, label = id)) + -->
+<!--   geom_point() + -->
+<!--   geom_text(size = 3, hjust = 0, nudge_x = 0.05) + -->
+<!--   xlab("Total number of point behaviors for Baby") + -->
+<!--   ylab("Total number of point behaviors for Mom") + -->
+<!--   facet_wrap(~ dyad_set) -->
+
+
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+
+<!-- dyad_unit_total_points_per_length <- data_dyad_total_points %>% -->
+<!--   ungroup() %>% -->
+<!--   group_by(dyad_set, id, dyad_unit) %>% -->
+<!--   summarize(total_point_count_per_length = sum(num_occurrences) / max(video_length)) %>% -->
+<!--   pivot_wider(names_from = dyad_unit, -->
+<!--               values_from = total_point_count_per_length) -->
+
+
+<!-- ggplot(dyad_unit_total_points_per_length, -->
+<!--        aes(x = Baby, y = Mom, label = id)) + -->
+<!--   geom_point() + -->
+<!--   geom_text(size = 3, hjust = 0, nudge_x = 0) + -->
+<!--   xlab("Total number of point behaviors per video length for Baby") + -->
+<!--   ylab("Total number of point behaviors per video length for Mom") + -->
+<!--   facet_wrap(~ dyad_set) -->
+
+
+
+<!-- ``` -->
+
+
+
+<!-- ## Log scale -->
+
+
+<!-- ```{r} -->
+
+<!-- dyad_unit_total_points <- data_dyad_total_points %>% -->
+<!--   ungroup() %>% -->
+<!--   group_by(dyad_set, id, dyad_unit) %>% -->
+<!--   summarize(total_point_count = sum(num_occurrences)) %>% -->
+<!--   pivot_wider(names_from = dyad_unit, -->
+<!--               values_from = total_point_count) -->
+
+
+<!-- ggplot(dyad_unit_total_points, -->
+<!--        aes(x = Baby, y = Mom, label = id)) + -->
+<!--   geom_point() + -->
+<!--   geom_text(size = 3, hjust = 0, nudge_x = 0.05) + -->
+<!--   scale_y_continuous(trans = "log10") + -->
+<!--   scale_x_continuous(trans = "log10") + -->
+<!--   xlab("Total number of point behaviors for Baby (log10)") + -->
+<!--   ylab("Total number of point behaviors for Mom (log10)") + -->
+<!--   facet_wrap(~ dyad_set) -->
+
+
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+
+<!-- dyad_unit_total_points_per_length <- data_dyad_total_points %>% -->
+<!--   ungroup() %>% -->
+<!--   group_by(dyad_set, id, dyad_unit) %>% -->
+<!--   summarize(total_point_count_per_length = sum(num_occurrences) / max(video_length)) %>% -->
+<!--   pivot_wider(names_from = dyad_unit, -->
+<!--               values_from = total_point_count_per_length) -->
+
+
+<!-- ggplot(dyad_unit_total_points_per_length, -->
+<!--        aes(x = Baby, y = Mom, label = id)) + -->
+<!--   geom_point() + -->
+<!--   geom_text(size = 3, hjust = 0, nudge_x = 0) + -->
+<!--   scale_y_continuous(trans = "log10") + -->
+<!--   scale_x_continuous(trans = "log10") + -->
+<!--   xlab("Total number of point behaviors per video length for Baby (log10)") + -->
+<!--   ylab("Total number of point behaviors per video length for Mom (log10)") + -->
+<!--   facet_wrap(~ dyad_set) -->
+
+
+<!-- ``` -->
+
+
+<!-- # Mom responses to infant cues -->
+
+
+<!-- ```{r} -->
+
+<!-- data_mom_response <- data_duration %>% -->
+<!--   ungroup() %>% -->
+<!--   group_by(dyad_set, id) %>% -->
+<!--   mutate(next_behavior = dplyr::lead(Grouped_behavior, n = 1, default = NA), -->
+<!--          next_time = dplyr::lead(time, n = 1, default = NA), -->
+<!--          next_unit = dplyr::lead(dyad_unit, n = 1, default = NA)) %>% -->
+<!--   filter(!Behavior %in% c("Eyes Open", "Not Crying")) %>% -->
+<!--   filter(!Grouped_behavior %in% c("Propped bottle", "Looks at phone or device")) %>% -->
+<!--   filter(dyad_unit == "Baby") %>% -->
+<!--   mutate(mom_response = as_factor(if_else(next_unit == "Baby", -->
+<!--                                           "No response", -->
+<!--                                           as.character(next_behavior)))) %>% -->
+<!--   mutate(response_time = next_time - time) %>% -->
+<!--   mutate(Behavior = fct_infreq(Behavior)) %>% -->
+<!--   ungroup() %>% -->
+<!--   mutate(mom_response2 = fct_lump_n(mom_response, 5)) %>% -->
+<!--   group_by(dyad_set, id) -->
+
+
+
+<!-- ggplot(data_mom_response) + -->
+<!--   geom_mosaic(aes(x = product(mom_response2, Behavior), -->
+<!--                   fill=mom_response2), na.rm = TRUE) + -->
+<!--   facet_grid(rows = vars(dyad_set)) +  -->
+<!--   scale_y_productlist() +  -->
+<!--   scale_x_productlist() + -->
+<!--   labs(x = "Infant cue", y = "Mom response",  -->
+<!--        title='') -->
+
+<!-- # write.csv(data_mom_response, "data-mom-response.csv") -->
+
+<!-- ``` -->
+
+
+<!-- ## Mom response time for each infant cue -->
+
+
+<!-- ```{r, response-plot, animation.hook="gifski", interval=2.5, fig.width=10, cache = TRUE} -->
+
+<!-- for (cue in cues) { -->
+<!--   p <- ggplot(data_mom_response %>% -->
+<!--                 filter(Behavior == cue) %>% -->
+<!--                 filter(!is.na(response_time)), -->
+<!--               aes(x = fct_reorder(mom_response2, response_time, median, .desc = TRUE), -->
+<!--                   y = response_time)) + -->
+<!--     geom_boxplot() + -->
+<!--     coord_flip() + -->
+<!--     xlab("Mom response") + -->
+<!--     ylab("Response time (sec)") + -->
+<!--     ggtitle(paste("Infant cue:", cue)) + -->
+<!--     facet_wrap(~dyad_set) -->
+
+<!--   plot(p) -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- ## Mom response time for each infant cue: constant time axis -->
+
+<!-- ```{r, response-plot-fixed, animation.hook="gifski", interval=2.5, fig.width=10, cache = TRUE} -->
+
+<!-- max_time = max(data_mom_response$response_time, na.rm = TRUE) -->
+
+<!-- for (cue in cues) { -->
+<!--   p <- ggplot(data_mom_response %>% -->
+<!--                 filter(Behavior == cue) %>% -->
+<!--                 filter(!is.na(response_time)), -->
+<!--               aes(x = fct_reorder(mom_response2, response_time, median, .desc = TRUE), -->
+<!--                   y = response_time)) + -->
+<!--     geom_boxplot() + -->
+<!--     ylim(0, max_time) + -->
+<!--     coord_flip() + -->
+<!--     xlab("Mom response") + -->
+<!--     ylab("Response time (sec)") + -->
+<!--     ggtitle(paste("Infant cue:", cue)) + -->
+<!--     facet_wrap(~dyad_set) -->
+
+<!--   plot(p) -->
+<!-- } -->
+<!-- ``` -->
+
+
+
+<!-- # Ali's questions -->
+
+
+```{r}
+
+# entire bottle bout
+
+bottle_bouts <- data_time_event %>%
+  summarize(num_cues = sum(infant_cue), 
+            bout_duration = first(duration)) %>%
+  filter(bout_duration > state_point_duration) %>%
+  mutate(num_cues_by_duration = num_cues / bout_duration)
+
+bottle_in_mouth_bouts <- bottle_bouts %>%
+  filter(Bottle_state == "Bottle in mouth")
+
+
+# end of bout (last fraction of bout)
+
+end_fraction = 0.25
+
+bottle_bouts_end <- data_time_event %>%
+  filter(time_fraction_bottle_state >= 1 - end_fraction) %>%
+  summarize(num_cues = sum(infant_cue))
+
+bottle_in_mouth_bouts_end <- bottle_bouts_end %>%
+  filter(Bottle_state == "Bottle in mouth")
+
+# last cue in bout
+
+bottle_bouts_last_cue <- data_time_event %>%
+  filter(num_cues_at_time > 0) %>%
+  slice(n())
+
+bottle_in_mouth_bouts_last_cue <- bottle_bouts_last_cue %>%
+  filter(Bottle_state == "Bottle in mouth")
+
+
+```
+
+
+
+
+# Babies' cues
+
+## 5.	What are the clusters of infant cues that occur together in bottle-in-mouth vs bottle-offered vs bottle-not-in-mouth contexts?
+
+
+```{r}
+
+data_baby_cues <- data %>%
+  filter(dyad_unit == "Baby") %>%
+  filter(!(Behavior %in% c("Eyes Open", "Not Crying"))) %>%
+  filter(!(Event_Type == "State stop")) %>%
+  filter(!is.na(Bottle_state))
+
+data_baby_cues_by_bottle_state <- data_baby_cues %>%
+  group_by(dyad_set, Behavior, Bottle_state) %>%
+  count(name = "count")
+
+
+plot_baby_cues_by_bottle_state <- ggplot(data_baby_cues_by_bottle_state,
+                                         aes(fill = Bottle_state,
+                                             y = count,
+                                             x = Behavior)) + 
+  geom_bar(position = "fill", stat = "identity") +
+  coord_flip() +
+  ylab("Percent of occurrences in bottle state") +
+  facet_grid(~ dyad_set)
+
+plot_bottle_state <- ggplot(data %>%
+                              filter(Event_Type == "State start") %>%
+                              filter(Behavior %in% bottle_states) %>%
+                            mutate(total = "Total duration") %>%
+                              group_by(dyad_set, total, Bottle_state) %>%
+                              mutate(total_time = sum(duration)),
+                            aes(fill=Bottle_state, y=total_time, x=total)) + 
+  geom_bar(position="fill", stat="identity") +
+  ylab("Percent of time in bottle state") + 
+  coord_flip() +
+  facet_grid(~ dyad_set)
+
+legend <- get_legend(
+  # create some space to the left of the legend
+  plot_bottle_state + theme(legend.box.margin = margin(0, 0, 0, 0))
+)
+
+plot_grid(
+  plot_grid(plot_baby_cues_by_bottle_state + theme(legend.position="none"),
+            plot_bottle_state + theme(legend.position="none"),
+            rel_heights = c(4, 1),
+            ncol = 1, nrow = 2,
+            align = "v"),
+  legend, rel_widths = c(5, 1))
+```
+
+
+This looks at just individual cues, not clusters. The plot displays for each infant cue the percent of occurrences of that cue that occur during each of the bottle states.  For example, about 65% of instances of "blocks mouth with hands" occur during bottle offered, about 23% during bottle not in mouth, and the rest during bottle in mouth.
+
+The bottom row is the overall percent of time spent in each bottle state: overall about 75% in bottle in mouth and about 25% in bottle not in mouth.  Bottle offered tends to be relatively short in duration compared to bottle in/out states.
+
+Lip compression and blocks mouth with hands occur almost exclusively within bottle offered.
+
+
+Still need to look at clusters of cues...
+
+
+### a.	Are some babies more likely to exhibit a few cues whereas others exhibit many?
+
+Yes, there is a lot of variability between dyads in the number of cues. I imagine this is more of a "classify the babies in clusters" type question. But let's first look at number of cues per bout for each dyad in each of the bottle states.  
+
+```{r}
+dyad_bout_totals <- bottle_bouts %>%
+  ungroup() %>%
+  group_by(dyad_set, id, Bottle_state) %>%
+  summarize(total_num_cues = sum(num_cues),
+            total_num_bouts = n()) %>% 
+  mutate(cues_per_bout = total_num_cues / total_num_bouts)
+
+cues_per_bout <- dyad_bout_totals %>%
+  filter(!is.na(Bottle_state)) %>%
+  select(dyad_set, id, Bottle_state, cues_per_bout) %>%
+  pivot_wider(names_from = Bottle_state,
+              values_from = cues_per_bout)
+
+ggpairs(cues_per_bout %>%
+          ungroup() %>%
+          select(-id),
+        aes(color = dyad_set, alpha = 0.4)) +
+  xlab("Number of cues per bout") +
+  ggtitle("Number of cues per bout in each bottle state per dyad")
+
+
+bottle_bouts %>% 
+  filter(dyad_set == "2moB")
+```
+
+
+Number of cues per bout is close to 0 for most babies, but a long right tail.  There isn't much of an association between the different bottle states.  There are some outliers and skewness which obscure the plot, so consider log scale.
+
+
+```{r}
+ggpairs(cues_per_bout %>%
+          ungroup() %>%
+          select(-id) %>%
+          mutate(across(-dyad_set, log)),
+        aes(color = dyad_set, alpha = 0.4)) +
+  xlab("log of Number of cues per bout") +
+  ggtitle("Number of cues per bout in each bottle state per dyad")
+
+```
+
+
+
+Still doesn't appear to be any association between the bottle states.
+
+Still need to explore clusters...
+
+
+# Mom response
+
+
+## 1. Describe variability in both the duration and number of bottle-in-mouth bouts – e.g., is there one long bout or many short bouts?
+
+
+Number of bottle-in-mouth bouts
+
+```{r}
+
+data_dyad_total_bottle_in_mouth <- data_dyad_total %>%
+  filter(Behavior == "Bottle in mouth")
+
+plot_bottle_in_mouth_pdf <- ggplot(data_dyad_total_bottle_in_mouth,
+       aes(x = num_occurrences,
+           y = after_stat(density),
+           colour = dyad_set)) +
+  geom_freqpoly(binwidth = 1, linetype = "solid") +
+  ylab("Proportion of dyads") +
+  xlab("Number of bottle-in-mouth bouts") +
+  ggtitle("Bottle-in-mouth bouts per dyad")
+
+
+# layer_data(p, 1) %>%
+#   select(colour, x, count, y) %>%
+#   mutate()
+
+plot_bottle_in_mouth_cdf <- ggplot(data_dyad_total_bottle_in_mouth,
+       aes(num_occurrences,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of dyads") +
+  xlab("Number of bottle-in-mouth bouts")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+The above plots summarize the total number of bottle-in-mouth bouts for each dyad. Most dyads have just a few bottle-in-mouth bouts--- median is around 5 bottle-in-mouth bouts per dyad --- but there are some with many. Extreme outlier is **2mo, 70307**.
+
+Duration of bottle-in-mouth bouts
+
+```{r}
+
+plot_bottle_in_mouth_pdf <- ggplot(bottle_in_mouth_bouts,
+       aes(x = bout_duration,
+#           y = after_stat(density),
+           fill = dyad_set)) +
+   geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
+  ylab("Density") +
+  xlab("Duration of bout (sec)") +
+  ggtitle("Duration of bottle-in-mouth bouts")
+
+
+
+plot_bottle_in_mouth_cdf <- ggplot(bottle_in_mouth_bouts,
+       aes(bout_duration,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Duration of bout (sec)")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+
+The above plot summarizes the duration of the individual bottle-in-mouth bouts.  Extreme outlier is **2month 70449**.
+
+Plots with the outlier excluded
+
+
+
+```{r}
+
+plot_bottle_in_mouth_pdf <- ggplot(bottle_in_mouth_bouts %>%
+                                     filter(!(id == 70449 & dyad_set == "2moB")),
+                                   aes(x = bout_duration,
+                                       #           y = after_stat(density),
+                                       fill = dyad_set)) +
+  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
+  ylab("Density") +
+  xlab("Duration of bout (sec)") +
+  ggtitle("Duration of bottle-in-mouth bouts")
+
+
+
+plot_bottle_in_mouth_cdf <- ggplot(bottle_in_mouth_bouts %>%
+                                     filter(!(id == 70449 & dyad_set == "2moB")),
+                                   aes(bout_duration,
+                                       colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Duration of bout (sec)")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+
+Most bouts are short in duration --- median is around 1 minute --- but there is a lot of variability.
+
+The above plots summarized individual bottle-in-mouth bouts. The following plots have totals for each dyad.
+
+
+```{r}
+
+ggplot(data_dyad_total_bottle_in_mouth,
+       aes(x = num_occurrences,
+           y = total_fraction,
+           size = total_duration)) +
+  geom_point(alpha = 0.2) +
+  facet_grid(~ dyad_set) +
+  labs(size = "Total duration (sec)",
+       y = "Fraction of total duration in bottle-in-mouth state",
+       x = "Number of bottle-in-mouth bouts") +
+  ggtitle("Bottle-in-mouth bouts per dyad")
+
+```
+
+The above plots summarize the total number of bottle-in-mouth bouts and the fraction of the duration spent in the bottle-in-mouth state for each dyad. The size of the points represents the total duration of the feeding.  Most dyads have a few bottle-in-mouth bouts that in total take up the most of the time of the feeding. But there is some variability, a little more so for 2 month than 2 week: both some dyads with few bouts and bottle-in-mouth a smaller fraction of duration, and some dyads with many bouts.  Check on the cluster in the bottom left for 2moB --- almost whole feeding spent outside of bottle-in-mouth.
+
+
+```{r}
+
+ggplot(data_dyad_total_bottle_in_mouth,
+       aes(x = num_occurrences,
+           y = total_duration)) +
+  geom_point(alpha = 0.2) +
+  facet_grid(~ dyad_set) +
+  labs(y = "Total duration (sec)",
+       x = "Number of bottle-in-mouth bouts") +
+  ggtitle("Bottle-in-mouth bouts per dyad")
+
+
+correl1 = data_dyad_total_bottle_in_mouth %>%
+  ungroup() %>%
+  group_by(dyad_set) %>%
+  summarize(correl = cor(num_occurrences, total_duration))
+
+```
+
+This is just a different version of the previous plot; total duration is total duration of the feeding (not just the time in bottle-in-mouth state).  There is only a weak association between total duration (sec) and number of bottle-in-mouth bouts; correlation is `r round(as.numeric(correl1[1, 2]), 2)` for 2 week and `r round(as.numeric(correl1[2, 2]), 2)` for 2 month (with outliers included). 
+
+
+
+
+
+
+### a.	Then, describe what proceeds the end of each bout? No infant cues, One infant cues, Multiple infant cues?
+
+
+**Total time in the bout.**
+
+```{r}
+
+plot_bottle_in_mouth_pdf <- ggplot(bottle_in_mouth_bouts,
+       aes(x = num_cues,
+           y = after_stat(density),
+           colour = dyad_set)) +
+  geom_freqpoly(binwidth = 1, linetype = "solid") +
+  ylab("Proportion of bouts") +
+  xlab("Number of infant cues during bout") +
+  ggtitle("Infant cues during Bottle-in-mouth bouts")
+
+
+# layer_data(p, 1) %>%
+#   select(colour, x, count, y) %>%
+#   mutate()
+
+plot_bottle_in_mouth_cdf <- ggplot(bottle_in_mouth_bouts,
+       aes(num_cues,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Number of infant cues during bout")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+The above plots display the total of number of infant cues that occur during each bottle in mouth bout. These plots do not take into consideration the length of the bout. The extreme outlier is **2month 70342**; here is the plot without the extreme outlier.
+
+```{r}
+
+plot_bottle_in_mouth_pdf <- ggplot(bottle_in_mouth_bouts %>%
+  filter(!(id == 70342 & dyad_set == "2moB")),
+       aes(x = num_cues,
+           y = after_stat(density),
+           colour = dyad_set)) +
+  geom_freqpoly(binwidth = 1, linetype = "solid") +
+  ylab("Proportion of bouts") +
+  xlab("Number of infant cues during bout") +
+  ggtitle("Infant cues during Bottle-in-mouth bouts")
+
+
+# layer_data(p, 1) %>%
+#   select(colour, x, count, y) %>%
+#   mutate()
+
+plot_bottle_in_mouth_cdf <- ggplot(bottle_in_mouth_bouts %>%
+  filter(!(id == 70342 & dyad_set == "2moB")),
+       aes(num_cues,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Number of infant cues during bout")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+About 80% of bottle-is-mouth bouts have at most 5 cues, but there is a long right tail.
+
+To adjust for length of bout, the following summarizes number of cues during the bout divided by the length of the bout.
+
+
+```{r}
+
+plot_bottle_in_mouth_pdf <- ggplot(bottle_in_mouth_bouts,
+       aes(x = num_cues_by_duration,
+           y = after_stat(density),
+           fill = dyad_set)) +
+   geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
+  ylab("Density") +
+  xlab("Number of infant cues during bout / length of bout (cues / sec)") +
+  ggtitle("Infant cues during Bottle-in-mouth bouts")
+
+
+# layer_data(p, 1) %>%
+#   select(colour, x, count, y) %>%
+#   mutate()
+
+plot_bottle_in_mouth_cdf <- ggplot(bottle_in_mouth_bouts,
+       aes(num_cues_by_duration,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Number of infant cues during bout / length of bout (cues / sec)")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+
+The pattern is similar to that for just the number of cues: for most bouts cues occur relatively infrequently, but there is lots of variability.
+
+
+
+**End of bout.**
+
+Now consider what happens at the end of each bout, defined as the last 25% of the duration of the bouth. The following plot only counts the number of cues that occur within the last 25% of each bout.
+
+
+```{r}
+
+plot_bottle_in_mouth_pdf <- ggplot(bottle_in_mouth_bouts_end,
+       aes(x = num_cues,
+           y = after_stat(density),
+           colour = dyad_set)) +
+  geom_freqpoly(binwidth = 1, linetype = "solid") +
+  ylab("Proportion of bouts") +
+  xlab("Number of infant cues during last 25% of bout") +
+  ggtitle("Infant cues during last 25% of duration of Bottle-in-mouth bouts")
+
+
+# layer_data(p, 1) %>%
+#   select(colour, x, count, y) %>%
+#   mutate()
+
+plot_bottle_in_mouth_cdf <- ggplot(bottle_in_mouth_bouts_end,
+       aes(num_cues,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Number of infant cues during last 25% of bout")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+Must bouts have 0, 1, or 2 cues in the end, but we see a long right tail again. The following groups 3+ cues together.
+
+```{r}
+
+ggplot(bottle_in_mouth_bouts_end,
+       aes(x = fct_lump(as.factor(num_cues), 3))) +
+  geom_bar(aes(y = ..prop.., group = 1)) +
+  ylab("Proportion of bouts") +
+  xlab("Number of infant cues during last 25% of bout") +
+  ggtitle("Infant cues during last 25% of duration of Bottle-in-mouth bouts") +
+  facet_grid(~ dyad_set)
+
+```
+
+**Last cue.**
+
+Above consider the last 25% of the bout.  Now we only look at the last cue in the bout, whenever it occurs during the bout, and only for bouts that have any cues.
+
+```{r}
+
+ggplot(bottle_in_mouth_bouts_last_cue,
+       aes(x = fct_infreq(cue_at_time))) +
+  geom_bar(aes(y = ..prop.., group = 1)) +
+  coord_flip() +
+  ylab("Proportion of bouts") +
+  xlab("Last infant cue") +
+  ggtitle("Last infant cue during bottle-in-mouth bouts") +
+  facet_grid(~ dyad_set)
+
+```
+
+For comparison, here is the overall distribution of cue type for bottle-in-mouth bouts.  The distribution of the type of the last cue is pretty similar to the overall distribution of the types of cues.
+
+
+
+
+```{r}
+
+ggplot(data_time_event %>%
+         filter(!is.na(cue_at_time)) %>%
+         group_by(dyad_set),
+       aes(x = fct_infreq(cue_at_time))) +
+  geom_bar(aes(y = ..prop.., group = 1)) +
+  coord_flip() +
+  ylab("Proportion of bouts") +
+  xlab("Infant cue") +
+  ggtitle("Infant cues during bottle-in-mouth bouts") +
+  facet_grid(~ dyad_set)
+
+```
+
+Now consider the timing of the last cue.
+
+
+```{r}
+
+plot_bottle_in_mouth_pdf <- ggplot(bottle_in_mouth_bouts_last_cue,
+       aes(x = time_fraction_bottle_state,
+           y = after_stat(density),
+           fill = dyad_set)) +
+   geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
+  ylab("Density") +
+  xlab("Time of occurrence during bout (0=start, 1=end)") +
+  ggtitle("Last infant cue during Bottle-in-mouth bouts")
+
+
+# layer_data(p, 1) %>%
+#   select(colour, x, count, y) %>%
+#   mutate()
+
+plot_bottle_in_mouth_cdf <- ggplot(bottle_in_mouth_bouts_last_cue,
+       aes(time_fraction_bottle_state,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Time of occurrence during bout (0=start, 1=end)")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+
+Most of the last cues occur during the "end" of the bout; median time is around the 0.85-0.90 mark, so about 10%-15% of the bout remaining.  But sometimes the last cue occurs very early in the bout.
+
+In terms of actual time
+
+```{r}
+
+plot_bottle_in_mouth_pdf <- ggplot(bottle_in_mouth_bouts_last_cue,
+       aes(x = time_remaining_in_bottle_state,
+           y = after_stat(density),
+           fill = dyad_set)) +
+   geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
+  ylab("Density") +
+  xlab("Time from last cue until end of bout (sec)") +
+  ggtitle("Last infant cue during Bottle-in-mouth bouts")
+
+
+# layer_data(p, 1) %>%
+#   select(colour, x, count, y) %>%
+#   mutate()
+
+plot_bottle_in_mouth_cdf <- ggplot(bottle_in_mouth_bouts_last_cue,
+       aes(time_remaining_in_bottle_state,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Time from last cue until end of bout (sec)")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+In most instances the last cue occurs right before the end of the bout, but there  is a long right tail.
+
+The following plots summarize the distribution timing of the last cue by cue.
+
+```{r}
+
+ggplot(bottle_in_mouth_bouts_last_cue,
+       aes(x = fct_reorder(cue_at_time, time_fraction_bottle_state, median, .desc = TRUE),
+           y = time_fraction_bottle_state)) +
+  geom_boxplot() +
+  coord_flip() +
+  ylab("Time of occurrence during bout (0=start, 1=end)") +
+  xlab("Last cue in bout") +
+  ggtitle("Time from last cue until end of bout (sec)") +
+  facet_wrap(~dyad_set)
+
+```
+
+```{r}
+
+ggplot(bottle_in_mouth_bouts_last_cue,
+       aes(x = fct_reorder(cue_at_time, time_remaining_in_bottle_state, median, .desc = TRUE),
+           y = time_remaining_in_bottle_state)) +
+  geom_boxplot() +
+  coord_flip() +
+  ylab("Time remaining in bottle-in-mouth bout (sec)") +
+  xlab("Last cue in bout") +
+  ggtitle("Bottle-in-mouth bouts") +
+  facet_wrap(~dyad_set)
+
+```
+
+
+
+### b.	What proceeds the final bottle-in-mouth bout?
+
+**During the final bottle-in-mouth bout**
+
+At first, I read this as "what occurs *during* the final bottle-in-mouth" bout.  I should put all the following plots side-by-side with the overall plots from 1a to compare what happens during the final bottle-in-mouth bout to the other bouts.  But in general, the patterns during the final bottle-in-mouth bout are pretty similar to the bottle-in-mouth bouts overall.
+
+```{r}
+# final bottle in mouth bout
+
+final_bottle_in_mouth_bouts <- data_time_event %>%
+  group_by(dyad_set, id) %>%
+  filter(Bottle_state == "Bottle in mouth") %>%
+  slice_max(Bottle_state_counter) %>%
+  summarize(num_cues = sum(infant_cue), 
+            bout_duration = first(duration)) %>%
+  filter(bout_duration > state_point_duration) %>%
+  mutate(num_cues_by_duration = num_cues / bout_duration)
+
+
+# end of final bottle in mouth bout (last fraction of bout)
+
+
+final_bottle_in_mouth_bouts_end <- data_time_event %>%
+    group_by(dyad_set, id) %>%
+  filter(Bottle_state == "Bottle in mouth") %>%
+  slice_max(Bottle_state_counter) %>%
+  filter(time_fraction_bottle_state >= 1 - end_fraction) %>%
+  summarize(num_cues = sum(infant_cue))
+
+
+# last cue in bout
+
+final_bottle_in_mouth_bouts_last_cue <- data_time_event %>%
+  filter(num_cues_at_time > 0) %>%
+  slice(n()) %>%
+  group_by(dyad_set, id) %>%
+  filter(Bottle_state == "Bottle in mouth") %>%
+  slice_max(Bottle_state_counter)
+```
+
+
+```{r}
+
+plot_final_bottle_in_mouth_pdf <- ggplot(final_bottle_in_mouth_bouts,
+       aes(x = num_cues,
+           y = after_stat(density),
+           colour = dyad_set)) +
+  geom_freqpoly(binwidth = 1, linetype = "solid") +
+  ylab("Proportion of bouts") +
+  xlab("Number of infant cues during final bottle-in-mouth bout") +
+  ggtitle("Infant cues during final Bottle-in-mouth bout for each dyad")
+
+
+# layer_data(p, 1) %>%
+#   select(colour, x, count, y) %>%
+#   mutate()
+
+plot_final_bottle_in_mouth_cdf <- ggplot(final_bottle_in_mouth_bouts,
+       aes(num_cues,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Number of infant cues during final bottle-in-mouth bout")
+
+plot_grid(plot_final_bottle_in_mouth_pdf,
+          plot_final_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+
+
+
+
+```{r}
+
+plot_bottle_in_mouth_pdf <- ggplot(final_bottle_in_mouth_bouts,
+       aes(x = num_cues_by_duration,
+           y = after_stat(density),
+           fill = dyad_set)) +
+   geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
+  ylab("Density") +
+  xlab("Number of infant cues during final bout / length of final bout (cues / sec)") +
+  ggtitle("Infant cues during final Bottle-in-mouth bouts")
+
+
+# layer_data(p, 1) %>%
+#   select(colour, x, count, y) %>%
+#   mutate()
+
+plot_bottle_in_mouth_cdf <- ggplot(final_bottle_in_mouth_bouts,
+       aes(num_cues_by_duration,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Number of infant cues during final bout / length of final bout (cues / sec)")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+
+
+
+
+**End of final bottle-in-mouth bout.**
+
+
+
+
+```{r}
+
+plot_bottle_in_mouth_pdf <- ggplot(final_bottle_in_mouth_bouts_end,
+       aes(x = num_cues,
+           y = after_stat(density),
+           colour = dyad_set)) +
+  geom_freqpoly(binwidth = 1, linetype = "solid") +
+  ylab("Proportion of bouts") +
+  xlab("Number of infant cues during last 25% of final bottle-in-mouth bout") +
+  ggtitle("Infant cues during last 25% of duration of final Bottle-in-mouth bouts")
+
+
+# layer_data(p, 1) %>%
+#   select(colour, x, count, y) %>%
+#   mutate()
+
+plot_bottle_in_mouth_cdf <- ggplot(final_bottle_in_mouth_bouts_end,
+       aes(num_cues,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Number of infant cues during last 25% of final bottle-in-mouth bout")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+
+```{r}
+
+ggplot(final_bottle_in_mouth_bouts_end,
+       aes(x = fct_lump(as.factor(num_cues), 3))) +
+  geom_bar(aes(y = ..prop.., group = 1)) +
+  ylab("Proportion of bouts") +
+  xlab("Number of infant cues during last 25% of final bottle-in-mouth bout") +
+  ggtitle("Infant cues during last 25% of duration of final Bottle-in-mouth bouts") +
+  facet_grid(~ dyad_set)
+
+```
+
+**Last cue in final bottle-in-mouth bout.**
+
+
+```{r}
+
+ggplot(final_bottle_in_mouth_bouts_last_cue,
+       aes(x = fct_infreq(cue_at_time))) +
+  geom_bar(aes(y = ..prop.., group = 1)) +
+  coord_flip() +
+  ylab("Proportion of bouts") +
+  xlab("Last infant cue in final bottle-in-mouth bout") +
+  ggtitle("Last infant cue during final bottle-in-mouth bouts") +
+  facet_grid(~ dyad_set)
+
+```
+
+
+
+```{r}
+
+plot_bottle_in_mouth_pdf <- ggplot(final_bottle_in_mouth_bouts_last_cue,
+       aes(x = time_fraction_bottle_state,
+           y = after_stat(density),
+           fill = dyad_set)) +
+   geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
+  ylab("Density") +
+  xlab("Time of occurrence during final bottle-in-mouth bout (0=start, 1=end)") +
+  ggtitle("Last infant cue during final Bottle-in-mouth bouts")
+
+
+# layer_data(p, 1) %>%
+#   select(colour, x, count, y) %>%
+#   mutate()
+
+plot_bottle_in_mouth_cdf <- ggplot(final_bottle_in_mouth_bouts_last_cue,
+       aes(time_fraction_bottle_state,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Time of occurrence during final bottle-in-mouth bout (0=start, 1=end)")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+
+
+
+```{r}
+
+plot_bottle_in_mouth_pdf <- ggplot(final_bottle_in_mouth_bouts_last_cue,
+       aes(x = time_remaining_in_bottle_state,
+           y = after_stat(density),
+           fill = dyad_set)) +
+   geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
+  ylab("Density") +
+  xlab("Time from last cue until end of final bottle-in-mouth bout (sec)") +
+  ggtitle("Last infant cue during final Bottle-in-mouth bouts")
+
+
+# layer_data(p, 1) %>%
+#   select(colour, x, count, y) %>%
+#   mutate()
+
+plot_bottle_in_mouth_cdf <- ggplot(final_bottle_in_mouth_bouts_last_cue,
+       aes(time_remaining_in_bottle_state,
+           colour = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of bouts") +
+  xlab("Time from last cue until end of final bottle-in-mouth bout (sec)")
+
+plot_grid(plot_bottle_in_mouth_pdf,
+          plot_bottle_in_mouth_cdf,
+          rel_heights = c(1, 1),
+          ncol = 1, nrow = 2,
+          align = "h")
+
+```
+
+
+
+```{r}
+
+ggplot(final_bottle_in_mouth_bouts_last_cue,
+       aes(x = fct_reorder(cue_at_time, time_fraction_bottle_state, median, .desc = TRUE),
+           y = time_fraction_bottle_state)) +
+  geom_boxplot() +
+  coord_flip() +
+  ylab("Time of occurrence during final bottle-in-mouth bout (0=start, 1=end)") +
+  xlab("Last cue in bout") +
+  ggtitle("Time from last cue until end of final bottle-in-mouth bout (sec)") +
+  facet_wrap(~dyad_set)
+
+```
+
+```{r}
+
+ggplot(final_bottle_in_mouth_bouts_last_cue,
+       aes(x = fct_reorder(cue_at_time, time_remaining_in_bottle_state, median, .desc = TRUE),
+           y = time_remaining_in_bottle_state)) +
+  geom_boxplot() +
+  coord_flip() +
+  ylab("Time remaining in final bottle-in-mouth bout (sec)") +
+  xlab("Last cue in final bottle-in-mouth bout") +
+  ggtitle("Final Bottle-in-mouth bouts") +
+  facet_wrap(~dyad_set)
+
+```
+
+
+
+**Proceeds final bottle-in-mouth bout**
+
+
+I still need to investigate this.  But I also have questions about how to define.  Are you looking for cues that occur immediately before final bottle-in-mouth starts?
+
+
+**A slight tangent on the distribution of the timing of cues during bouts**
+
+I considered the last 25% of the bout above.  How much does the threshold --- 25% versus 50% etc --- matter?  Depends on the distribution of the timing of cues.
+
+The following plot displays when the infant cues during the bottle bouts. The timing of the cues is fairly uniformly distributed over the length of the bottle-in-mouth bout, except that
+
+- Bottle not in mouth: there is a tendency for cues to happen closer to the start of the state
+- Bottle in mouth: there is a slight tendency for cues to happen closer to the end of the bout. And a slightly increased frequency also at the start of the bout (more pronounced for 2wk than 2mo)
+- Bottle offered: fairly uniform, maybe slight tendency to be in middle 
+
+
+```{r}
+
+ggplot(data_time_event %>%
+         filter(infant_cue > 0) %>%
+         filter(!is.na(Bottle_state)),
+       aes(x = time_fraction_bottle_state,
+           y = after_stat(density),
+           fill = Bottle_state)) +
+  geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
+  ylab("Density") +
+  xlab("Time of occurrence in bout (0 = start; 1 = end)") +
+  ggtitle("Infant cues during Bottle-in-mouth bouts") +
+  facet_grid(~ dyad_set)
+
+
+
+
+# plot_bottle_in_mouth_cdf <- ggplot(data_time_event %>%
+#                                      filter(infant_cue > 0),
+#                                    aes(time_fraction_bottle_state,
+#                                        colour = dyad_set)) +
+#   stat_ecdf() +
+#   ylab("Cumulative proportion of bouts") +
+#   xlab("Number of infant cues during bout")
+# 
+# plot_grid(plot_bottle_in_mouth_pdf,
+#           plot_bottle_in_mouth_cdf,
+#           rel_heights = c(1, 1),
+#           ncol = 1, nrow = 2,
+#           align = "h")
+
+```
+
+## 2.	When the state is bottle-in-mouth and infant cues occur (excluding Blocks mouth and Lip compression):
+
+Lip compression does not occur that frequently and blocks mouth even less so, so I haven't separated these out yet.  But I suspect the summaries from 1 won't change much when I do.
+
+### a.	Similar to 1a above: How many infant cues occur until bottle-not-in-mouth occurs? (could check of transition to bottle-offer, too, but I think bottle-in-mouth should mainly be followed by bottle-not-in-mouth)
+
+The table below summarizes the transitions between bottle states.
+
+- Bottle-in-mouth is almost always followed by bottle-not-in-mouth
+- Bottle-not-in-mouth is usually followed by bottle offered, but can be followed by bottle-in-mouth (NA is just the end of the feeding; bottle-not-in-mouth to NA means the feeding is over.)
+- Bottle offered is usually followed by bottle-in-mouth but some times bottle-not-in-mouth
+
+```{r}
+
+data_time_event %>% 
+  slice(1) %>%
+  group_by(dyad_set, id) %>%
+  mutate(next_bottle_state =
+           dplyr::lead(Bottle_state, n = 1, default = NA)) %>%
+  ungroup() %>%
+  filter(!is.na(Bottle_state)) %>%
+  group_by(Bottle_state, next_bottle_state) %>%
+  summarize(cell_count = n()) %>%
+  group_by(Bottle_state) %>%
+  mutate(cell_prop = cell_count / sum(cell_count)) %>%
+  select(-cell_count) %>%
+  pivot_wider(names_from = next_bottle_state, values_from = cell_prop) %>%
+  kable()
+
+
+      
+
+```
+
+
+Given that bottle-in-mouth is almost always followed by bottle-not-in-mouth, the summaries from 1a still apply here.
+
+
+### b.	How long between final infant cue and bottle-not-in-mouth?                          (could check of transition to bottle-offer, too, but I think bottle-in-mouth should mainly be followed by bottle-not-in-mouth)
+
+See 1a.
+
+
+### c.	How much variability (both within-person and between-person) is there in these trends? Can we identify clusters of cues? Clusters of dyads?
+
+
+See 1a for summaries relating to between-person variability.
+
+
+The plot below summarizes the number of cues in individual bouts for each dyad, with dyads with only a single bottle-in-mouth separated.  Still experimenting with ways to better summarize and display within-person variability.
+
+```{r}
+
+dyad_bottle_in_mouth_bouts <- bottle_in_mouth_bouts %>%
+  group_by(dyad_set, id) %>%
+  summarize_at(vars(num_cues),
+               list(number_of_bouts = ~length(.),
+                    total_cues = ~sum(.),
+                    mean_cues_per_bout = ~mean(.), ~sd(.),
+                    ~min(.), ~median(.), ~max(.))) %>%
+  filter(!(id == 70342 & dyad_set == "2moB"))
+
+# dyad_bottle_in_mouth_bouts %>%
+#   arrange(dyad_set, desc(max)) %>%
+#   kable(digits = 1)
+
+```
+
+
+
+
+```{r}
+
+ggplot(dyad_bottle_in_mouth_bouts %>%
+         filter(number_of_bouts > 1),
+       aes(x = max - min,
+           y = min,
+           color = fct_lump(as.character(number_of_bouts), 5))) +
+  geom_point(alpha = 0.5) +
+  geom_jitter(width = 0.1, height = 0.1) + 
+  facet_grid(~ dyad_set) +
+  labs(color = "Number of bouts",
+       x = "Range (max - min) of number of cues in bout",
+       y = "Minimum number of cues in bout") +
+  ggtitle("Bottle-in-mouth bouts for dyads with multiple bouts")
+```
+
+
+```{r}
+
+ggplot(dyad_bottle_in_mouth_bouts %>%
+         filter(number_of_bouts <= 1),
+       aes(x = total_cues,
+           color = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of dyads") +
+  xlab("Number of cues during bout") +
+  ggtitle("Bottle-in-mouth bouts for dyads with a single bout")
+
+```
+
+
+The following summarizes within-person variability of the time --- measured in [0, 1], 0=start, 1=end --- of the last cue in each bout.
+
+
+```{r}
+
+dyad_bottle_in_mouth_last_cue <- bottle_in_mouth_bouts_last_cue %>%
+  group_by(dyad_set, id) %>%
+  summarize_at(vars(time_fraction_bottle_state),
+               list(number_of_bouts = ~length(.),
+                    ~mean(.), ~sd(.),
+                    ~min(.), ~median(.), ~max(.)))
+
+# dyad_bottle_in_mouth_bouts %>%
+#   arrange(dyad_set, desc(max)) %>%
+#   kable(digits = 1)
+
+```
+
+
+
+
+
+```{r}
+
+ggplot(dyad_bottle_in_mouth_last_cue %>%
+         filter(number_of_bouts > 1),
+       aes(x = max - min,
+           y = min,
+           color = fct_lump(as.character(number_of_bouts), 5))) +
+  geom_point(alpha = 0.5) +
+  geom_jitter(width = 0.1, height = 0.1) + 
+  facet_grid(~ dyad_set) +
+  labs(color = "Number of bouts",
+       x = "Range (max - min) of [0, 1]-time of last cue",
+       y = "Time of earliest last cue") +
+  ggtitle("Time of last cues for bottle-in-mouth bouts for dyads with multiple bouts")
+
+
+```
+
+
+
+
+```{r}
+
+ggplot(dyad_bottle_in_mouth_last_cue %>%
+         filter(number_of_bouts <= 1),
+       aes(x = max,
+           color = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of dyads") +
+  xlab("Time in bout (0=start, 1=end) of last cue") +
+  ggtitle("Time of last cue in Bottle-in-mouth bouts for dyads with a single bout")
+
+```
+
+Time (sec) from last cue until end of bottle-in-mouth
+
+```{r}
+
+dyad_bottle_in_mouth_last_cue_time <- bottle_in_mouth_bouts_last_cue %>%
+  group_by(dyad_set, id) %>%
+  summarize_at(vars(time_remaining_in_bottle_state),
+               list(number_of_bouts = ~length(.),
+                    ~mean(.), ~sd(.),
+                    ~min(.), ~median(.), ~max(.)))
+
+# dyad_bottle_in_mouth_bouts %>%
+#   arrange(dyad_set, desc(max)) %>%
+#   kable(digits = 1)
+
+```
+
+
+
+
+
+```{r}
+
+ggplot(dyad_bottle_in_mouth_last_cue_time %>%
+         filter(number_of_bouts > 1),
+       aes(x = max - min,
+           y = min,
+           color = fct_lump(as.character(number_of_bouts), 5))) +
+  geom_point(alpha = 0.5) +
+  geom_jitter(width = 0.1, height = 0.1) + 
+  facet_grid(~ dyad_set) +
+  labs(color = "Number of bouts",
+       x = "Range (max - min) of time (sec) from last cue to end of bout",
+       y = "Shortest time (sec) from last cue to end of bout") +
+  ggtitle("Time from last cues to end of bottle-in-mouth bouts for dyads with multiple bouts")
+
+
+```
+
+
+
+
+```{r}
+
+ggplot(dyad_bottle_in_mouth_last_cue_time %>%
+         filter(number_of_bouts <= 1),
+       aes(x = max,
+           color = dyad_set)) +
+  stat_ecdf() +
+  ylab("Cumulative proportion of dyads") +
+  xlab("Time (sec) from last cue until end of bout") +
+  ggtitle("Time (sec) from last cue to end of Bottle-in-mouth bouts for dyads with a single bout")
+
+```
+
+
+
+Still need to investigate clusters of cues and clusters of dyads...
+
+### d.	How often do Breaks infant’s suction or Verbal limiting of intake occur during bottle-in-mouth?
+
+There are only a few instances of these behaviors in the data.
+
+```{r}
+
+data %>%
+  filter(str_detect(Grouped_behavior, "Limiting")) %>%
+  filter(!is.na(Bottle_state)) %>%
+  select(Behavior, Bottle_state, dyad_set) %>%
+  table() %>% addmargins()
+
+```
+
+
+
+## 3.	When the state is bottle-offer and infant cues occur (especially Blocks mouth and Lip compression, but others, too):
+
+### a.	How often does this lead to a controlling maternal behavior: 
+
+(1)	Pushes bottle into infant’s mouth
+(2)	Verbal stimulation of sucking or feeding
+(3)	Physical stimulation of sucking or feeding
+
+
+```{r}
+# Jake's Attempt
+
+mom_nxt_bvr <- data_time_event %>%
+  
+  ungroup() %>%
+  group_by(dyad_set,id) %>%
+  
+  # added a row number variable to count the number of consecutive infant cues
+  rowid_to_column("row_num") %>%  
+  
+  # added an indicator for controlling mother behaviors
+  mutate(`Maternal Behavior` = case_when(
+    `Pushes bottle into infant's mouth` == 1 ~ "Push",
+    `Verbal stimulation of sucking or feeding` == 1 ~ "Verbal",
+    `Physical stimulation of sucking or feeding` == 1 ~ "Physical",
+    TRUE ~ "Not Controlling")) %>%
+  
+  # filtered down to where it's just bottle offered AND infant cue OR dyad unit is mom
+  # gets rid of all unwanted infant cues and instances where dyad unit is baby and infant cue doesn't happen
+  # should be okay because I'll be able to count how many missing cues were in between mom's action and baby
+  filter(Bottle_state == "Bottle offered" & infant_cue == 1 | dyad_unit == "Mom") %>%
+
+  # variable to see if previous dyad is baby
+  # - creates NA's if behavior is start of a group i think
+  mutate(who_prev_behavior = dplyr::lag(dyad_unit, n = 1, default = NA)) %>%
+
+  # filter to where dyad_unit is "Baby" AND previous behavior was caused by "Mom" OR 
+  # dyad_unit == "Mom" AND the previous behavior was caused by "Baby"
+  filter(dyad_unit == "Baby" & who_prev_behavior == "Mom" | dyad_unit == "Mom" & who_prev_behavior == "Baby")
+
+
+#split into two data sets to count number of infant cues between and to count time between behavior
+
+# 1. Contains all baby actions
+
+baby_cues <- mom_nxt_bvr %>%
+  filter(dyad_unit == "Baby") %>%
+  select(1:3,5)
+
+
+# 2. Contains all Mom actions
+
+mom_reaction <- mom_nxt_bvr %>%
+  filter(dyad_unit == "Mom")%>%
+  select(1:3,5, `Maternal Behavior`)
+
+
+# 3. Combined two data sets to make wider data set
+
+combined <- cbind(baby_cues, mom_reaction) %>%
+  mutate(time_passed = `time...8`-`time...4`,
+         con_infant_behaviors = `row_num...5`-`row_num...1` - 1) %>%
+  rename(dyad_set = dyad_set...2,
+         id = id...3,
+         time = time...4) %>%
+  select(dyad_set,id,`Maternal Behavior`,time,time_passed,con_infant_behaviors)
+
+# Plot - one for 2wkB and one for 2moB (what behaviors are most common, 1, 2, 3, or non-controlling behavior)
+combined %>%
+  ggplot(aes(x = `Maternal Behavior`,fill=as.factor(dyad_set)))+
+    geom_bar(aes( y=..count../tapply(..count.., ..fill.. ,sum)[..fill..]), position="dodge") + 
+    ylim(0,1)+
+    coord_flip() +
+    ggtitle("Mom's Next Behavior After Infant Cue during Bottle-Offer State") +
+    ylab("Proportion Per Dyad Set") +
+    labs(fill = "Dyad Set")
+    
+    
+# Summary Stats - Average Time Until Mom Acts. 
+combined %>%
+  group_by(`Maternal Behavior`) %>%
+  summarise(`Average Time (seconds) Until Mom's Behavior` = mean(time_passed),
+            `Average Number of Infant Cues in a Row` = mean(con_infant_behaviors))
+
+
+```
+
+```{r}
+# rate = number of controlling infant behaviors / time passed 
+combined$rate <- combined$con_infant_behaviors / combined$time_passed
+
+
+
+# Scatterplot of Time vs Time Until Mom Reacts
+combined %>%
+ggplot(aes(x = time,
+           y = time_passed,
+           color = `Maternal Behavior`, 5)) +
+  geom_point(alpha = 0.5) +
+  geom_jitter(width = 0.1, height = 0.1) + 
+  # coord_flip()+
+  # ylim(c(0,50))+
+  facet_grid(dyad_set~`Maternal Behavior`) + 
+  ggtitle("Time vs Time Until Mom Reacts to Infant Cue (In Seconds)") +
+  ylab("Time Until Mom Reacts to Infant Cue") + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1))
+
+ 
+
+#Scatterplot of Time vs Rate of Controlling Cues
+# where rate of controlling cues is number of controlling cues in a a row /  time passed
+# this plot basically shows 
+combined %>%
+ggplot(aes(x = time,
+           y = rate,
+           color = `Maternal Behavior`, 5)) +
+  geom_point(alpha = 0.5) +
+  geom_jitter(width = 0.1, height = 0.1) + 
+  # coord_flip()+
+  # ylim(c(0,50))+
+  facet_grid(dyad_set~`Maternal Behavior`) + 
+  ggtitle("Time vs Rate of Controlling Cues") +
+  ylab("Rate") + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1))
+
+```
+
+
+
+
+Still thinking about how to define "Lead to":
+
+- is the immediate next event (mom or baby) a controlling mom behavior?
+- when the next mom behavior happens, it is controlling?
+- does a controlling mom behavior happen within some window of time starting with the infant cue (bottle-offer is usually short, but might be relevant for bottle-not-in-mouth)
+- reverse perpective, for each mom response, how many baby cues proceed, and what are they
+
+
+
+### b.	How often does this lead to responsive behaviors: 
+
+(1)	Verbal acknowledgement of fullness (or hunger)
+(2)	bottle-not-in-mouth 
+(3)	Indicates feeding is over
+
+### c.	How many subsequent bottle-offers occur until mother Indicates feed is over
+
+
+## 4.	When the state is bottle-not-in-mouth and infant cues occur:
+
+### a.	How often does this lead to a controlling maternal behavior: 
+
+(1)	bottle-offer
+(2)	Pushes bottle into infant’s mouth
+(3)	Verbal stimulation of sucking or feeding
+(4)	Physical stimulation of sucking or feeding
+
+
+```{r}
+
+```
+
+
+### b.	How often does this lead to responsive behaviors: 
+
+(1)	Burping
+(2)	Verbal acknowledgement of fullness (or hunger)
+(3)	bottle-not-in-mouth 
+(4)	Indicates feeding is over
+
+
+
+
+## 5.	How often does Verbal stimulation of sucking or feeding and Physical stimulation of sucking or feeding occur during the bottle-in-mouth state, bottle-offer state, and bottle-not-in-mouth state?
+
+```{r}
+
+data_stimulation <- data %>%
+  filter(str_detect(Behavior, "stimulation")) %>%
+  filter(!is.na(Bottle_state))
+
+data_stimulation_by_bottle_state <- data_stimulation %>%
+  group_by(dyad_set, Behavior, Bottle_state) %>%
+  count(name = "num_occurrences")
+
+ggplot(data_stimulation_by_bottle_state,
+       aes(fill = Bottle_state,
+           y = num_occurrences,
+           x = Behavior)) + 
+  geom_bar(position = "fill", stat = "identity") +
+  coord_flip() +
+  ylab("Proportion of occurrences") +
+  facet_grid(~ dyad_set)
+
+```
+
+The above plot just displays, out of all the instances of each behavior, what proportion of occurrences take place during each bottle state.  But bottle-in-mouth takes up the largest part of the feeding, so we'll control for that and look at number of occurrences per length in bottle state.  (Note: plot excludes any dyads with 0 occurrences of the behavior.)
+
+
+```{r}
+
+data_stimulation_dyad_total <- data_stimulation %>%
+  group_by(dyad_set, id, Behavior, Bottle_state) %>%
+  count(name = "num_occurrences") %>%
+  left_join(data_dyad_total %>%
+              select(dyad_set, id, Behavior,
+                     total_fraction, total_duration),
+            by = c("dyad_set",
+                   "id",
+                   "Bottle_state" = "Behavior")) %>%
+  mutate(num_per_length = num_occurrences / total_duration,
+         num_per_fraction = num_occurrences / total_fraction)
+
+ggplot(data_stimulation_dyad_total,
+       aes(x = Bottle_state,
+           y = num_per_fraction)) +
+  geom_boxplot(aes(color = Behavior)) +
+  coord_flip() +
+  xlab("Bottle state") +
+  ylab("Number of occurrences of Behavior / Proportion of time in Bottle state") +
+  facet_wrap(~ dyad_set) +
+  theme(legend.position="bottom")
+
+
+ggplot(data_stimulation_dyad_total,
+       aes(x = Bottle_state,
+           y = num_per_length)) +
+  geom_boxplot(aes(color = Behavior)) +
+  coord_flip() +
+  xlab("Bottle state") +
+  ylab("Number of occurrences of Behavior /  Time (sec) in Bottle state") +
+  facet_wrap(~ dyad_set) +
+  theme(legend.position="bottom")
+
+
+# ggplot(data_stimulation_dyad_total,
+#        aes(x = Bottle_state,
+#            y = num_per_fraction,
+#            fill = Behavior)) +
+#   geom_dotplot(binaxis = "y", stackdir = "center", position = "dodge") + 
+#   coord_flip() +
+#   xlab("Bottle state") +
+#   ylab("Number of occurrences of Behavior / Proportion of time in Bottle state") +
+#   facet_wrap(~ dyad_set) +
+#   theme(legend.position="bottom")
+
+```
+
+
+Even though the bottle offered bouts account for a small fraction of the duration of the feeding, stimulating behaviors occur relatively frequently during bottle offered state as compared with the other bottle states.  
+
+
+### a.	Can we distinguish between mothers who do this infrequently versus extensively during each state?
+
+
+```{r}
+
+stimulation <- data_stimulation_dyad_total %>%
+  group_by(dyad_set, id, Bottle_state) %>%
+  select(dyad_set, id, Bottle_state, Behavior, num_per_length) %>% 
+  pivot_wider(names_from = Behavior, values_from = num_per_length)
+
+```
+
+The following table displays the percentage of dyads in which the mom exhibits the behavior at least once for each bottle state.  Verbal stimulation does not occur very frequently.
+
+```{r}
+
+stimulation %>%
+  group_by(dyad_set, Bottle_state) %>%
+  mutate(across(contains("stimulation"), ~!is.na(.x))) %>%
+  summarize(across(contains("stimulation"), sum)) %>%
+  left_join(n_dyads) %>%
+  mutate(across(contains("stimulation"), ~round(100 * .x / n), 1)) %>%
+  select(-n) %>%
+  kable()
+
+
+```
+
+For example, 77% of dyads in the 2 week set exhibit physical stimulation at least once duing the bottle-in-mouth phase.
+
+The following plot summarizes number of instances of physical stimulation per duration of each bottle state among the dyads who do exhibit physical stimulation in the bottle states.  Remember, aside from bottle-in-mouth state, only a handful of dyads exhibit this behavior.
+
+```{r}
+
+
+ggplot(data_stimulation_dyad_total %>%
+         filter(str_detect(Behavior, "Physical")) %>%
+         filter(!is.na(Bottle_state)),
+       aes(x = num_per_length,
+#           x = Bottle_state)) +
+           y = after_stat(density),
+fill = Bottle_state)) +
+geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
+#  geom_dotplot(binaxis = "y", stackdir = "center") + 
+  ylab("Density") +
+  xlab("Number of instances per duration of bottle state (instances / sec)") +
+  ggtitle("Instances of Physical Stimulation") +
+  facet_grid(~ dyad_set)
+
+```
+
+
+
+The following plot summarizes number of instances of verbal stimulation per duration of each bottle state among the dyads who do exhibit verbal stimulation in the bottle states.  Remember, only a handful of dyads exhibit this behavior.
+
+```{r}
+
+
+ggplot(data_stimulation_dyad_total %>%
+         filter(str_detect(Behavior, "Verbal")) %>%
+         filter(!is.na(Bottle_state)),
+       aes(x = num_per_length,
+#           x = Bottle_state)) +
+           y = after_stat(density),
+fill = Bottle_state)) +
+geom_histogram(alpha = 0.5, aes(y = ..density..), position = 'identity') +
+#  geom_dotplot(binaxis = "y", stackdir = "center") + 
+  ylab("Density") +
+  xlab("Number of instances per duration of bottle state (instances / sec)") +
+  ggtitle("Instances of Verbal Stimulation") +
+  facet_grid(~ dyad_set)
+
+```
+
+
+
+Still need to investigate clusters...
+
+Jake's work on these 
+
+## 6.	Other considerations for how to describe/classify/cluster mom behaviors:
+
+a.	Responsive: Infant Cue or Cluster of Cues followed by:
+
+i.	Burping
+ii.	bottle-not-in-mouth
+iii.	Verbal Acknowledgement of Hunger and/or Fullness
+iv.	Indicates feeding is over
+
+```{r}
+# Mosaic plot is 
+
+resp_beh <- c("Burping","Bottle not in mouth", "Verbal acknowledgement of fullness","Verbal acknowledgement of hunger","Indicates feeding is over")
+
+resp_inf_cue <- data %>%
+  
+  ungroup() %>%
+  group_by(dyad_set,id) %>%
+  
+  mutate(prev_behavior = dplyr::lag(Behavior, n = 1, default = NA)) %>%
+  
+  # filter(dyad_unit == "Baby") %>%
+  
+  filter(Behavior %in% resp_beh) %>%
+  
+  select(dyad_set, id, dyad_unit, Behavior, prev_behavior)
+
+mosaic_p <- resp_inf_cue %>%
+  ggplot() +
+    geom_mosaic(aes(x=product(Behavior, prev_behavior), fill = Behavior)) + 
+    labs(y="Responsive Infant Cues", x="Infant Cues Directly Prior to Responsive Cues", title = "Responsive Infant Cues") 
+
+mosaic_p + facet_wrap( ~ dyad_set, nrow = 3) + 
+  theme(legend.position = "right")
+
+infant_cues <- data %>%
+  filter(dyad_unit == "Baby")
+
+unique(infant_cues$Behavior)
+```
+
+```{r}
+
+resp_beh <- c("Burping","Bottle not in mouth", "Verbal acknowledgement of fullness","Verbal acknowledgement of hunger","Indicates feeding is over")
+
+
+for (behav in resp_beh){
+  burping <- data %>%
+    
+    ungroup() %>%
+    group_by(dyad_set,id) %>%
+    
+    mutate(prev_behavior = dplyr::lag(Behavior, n = 1, default = NA)) %>%
+    
+    filter(Behavior == behav) %>%
+    
+    select(dyad_set, id, Behavior, prev_behavior)
+  
+  print(burping %>%
+    ggplot(aes(x=prev_behavior, y = (..count..)/sum(..count..))) + 
+    geom_bar()+
+    ggtitle("Behavior followed by", behav) +
+    coord_flip() + 
+    facet_wrap(~dyad_set)
+  )
+}
+
+
+```
+
+b.	Controlling-Limiting: Infant Cue or Cluster of Cues if followed by:
+i.	Breaks infant’s suction
+ii.	Verbal Limiting of intake
+c.	Controlling-Encouragement: Infant Cue or Cluster of Cues is followed by:
+i.	Verbal stimulation of sucking or feeding 
+ii.	Physical stimulation of sucking or feeding 
+iii.	Assesses bottle contents + Verbal stimulation of sucking or feeding and/or Physical stimulation of sucking or feeding 
+d.	After a mom assesses bottle contents:
+i.	How many times does bottle-offer occur after Assesses bottle contents?
+ii.	How many times does the mom offer after an assess?
+iii.	How many times is assess followed by stimulation?
+
+
+
+## 7.	What is the pattern of behaviors that proceeds Indicates feeding is over?
+
+a.	Could focus on the last 50% of 25% of the feeding prior to Indicates feeding is over
+
+```{r}
+# still trying to think of a better way to get n % of previous behaviors
+# and trying to think of a much better way to plot them
+
+# currently I have new columns / variables for each of the 5 previous behaviors.
+# Difficult to plot them as individual unique sets of 5 because there will just be two many
+# better way to plot many many categorical variables? or take top n of these
+
+patterns <- data %>%
+  mutate(prev_pattern_behav5 = c(dplyr::lag(Behavior, n = 5, default = NA)),
+         prev_pattern_behav4 = c(dplyr::lag(Behavior, n = 4, default = NA)),
+         prev_pattern_behav3 = c(dplyr::lag(Behavior, n = 3, default = NA)),
+         prev_pattern_behav2 = c(dplyr::lag(Behavior, n = 2, default = NA)),
+         prev_pattern_behav1 = c(dplyr::lag(Behavior, n = 1, default = NA))) %>%
+  # mutate(prev_5_behaviors = list(c(prev_pattern_behav5,prev_pattern_behav4,prev_pattern_behav3,prev_pattern_behav2,prev_pattern_behav1))) %>%
+  filter(Behavior == "Indicates feeding is over")
+
+
+p1 <- patterns %>%
+  ggplot(aes(x=prev_pattern_behav1, y = (..count..)/sum(..count..))) +
+    geom_bar() + 
+    labs(y="1 Before Indicates Feeding is Over") +
+    coord_flip()+
+    xlab("")
+
+p1 + facet_wrap( ~ dyad_set, nrow = 1) + 
+  theme(legend.position = "none")
+
+
+p2 <- patterns %>%
+  ggplot(aes(x=prev_pattern_behav2, y = (..count..)/sum(..count..))) +
+    geom_bar() + 
+    labs(y="Behvaior 2 Behaviors Before Indicates Feeding is Over") +
+    coord_flip() +
+    xlab("")
+
+p2 + facet_wrap( ~ dyad_set, nrow = 1) + 
+  theme(legend.position = "none")
+
+
+p3 <- patterns %>%
+  ggplot(aes(x=prev_pattern_behav3, y = (..count..)/sum(..count..))) +
+    geom_bar() + 
+    labs(y="Behvaior 3 Behaviors  Before Indicates Feeding is Over") +
+    coord_flip() + 
+    xlab("")
+
+p3 + facet_wrap( ~ dyad_set, nrow = 1) + 
+  theme(legend.position = "none")
+
+
+p4 <- patterns %>%
+  ggplot(aes(x=prev_pattern_behav4, y = (..count..)/sum(..count..))) +
+    geom_bar() + 
+    labs(y="Behvaior 4 Behaviors  Before Indicates Feeding is Over") +
+    coord_flip() +
+    xlab("")
+
+p4 + facet_wrap( ~ dyad_set, nrow = 1) + 
+  theme(legend.position = "none")
+
+
+
+p5 <- patterns %>%
+  ggplot(aes(x=prev_pattern_behav5, y = (..count..)/sum(..count..))) +
+    geom_bar() + 
+    labs(y="Behvaior 5 Behaviors Before Indicates Feeding is Over") +
+    coord_flip()+
+    xlab("")
+
+p5 + facet_wrap( ~ dyad_set, nrow = 1) + 
+  theme(legend.position = "none")
+  
+
+```
+
+b.	How can we describe the cascade of events that lead mom to say this?
+i.	Is it multiple infant cues followed by multiple bottle-offer and Verbal stimulation of sucking or feeding and/or Physical stimulation of sucking or feeding
+ii.	Or is it fewer infant cues and more immediate responsive mother behaviors?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

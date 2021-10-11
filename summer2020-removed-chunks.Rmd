@@ -1,0 +1,570 @@
+---
+title: "summer2020-removed-chunks"
+author: "William Medwid"
+date: "7/14/2021"
+output: html_document
+---
+
+Code that was commented out in descriptive-statistics-summer-2020. Setup is still needed. 
+
+<!-- ## Grouped behaviors -->
+
+```{r dyad-grouped}
+
+data_dyad_grouped <- data_duration %>%
+  group_by(dyad_set, id, Grouped_behavior, dyad_unit) %>%
+  summarize(Event_Type = first(Event_Type),
+            total_fraction = sum(duration_fraction),
+            total_duration = sum(duration),
+            num_occurrences = n(),
+            video_length = max(video_length)) %>%
+  mutate(num_per_length = num_occurrences / video_length)
+
+# State behaviors only
+
+data_dyad_grouped_states <- data_dyad_grouped %>%
+  filter(Event_Type == "State start")
+
+data_dyad_grouped_points <- data_dyad_grouped %>%
+  filter(Event_Type == "State point")
+
+```
+
+
+# Timeline plot for all dyads
+
+
+```{r timeline-plot-data, fig.width = 10}
+
+data_duration_plot <- data_duration %>%
+  select(dyad_set, id, dyad_unit, Behavior, Event_Type, time, end_time) %>%#,
+#         start_fraction, end_fraction, end_time) %>%
+  mutate(Behavior = fct_relevel(Behavior, sort)) %>%
+  mutate(row_id = row_number()) %>%
+  gather("state", "time", c(time, end_time)) %>%
+  arrange(dyad_set, id, Behavior, time)
+
+```
+
+
+animation.hook="ffmpeg"
+
+fig.show='animate'
+
+```{r, timeline-gif, animation.hook="gifski", interval=2.5, fig.width=10, cache = TRUE}
+
+ids = sort(unique(data$id))
+
+for (id_to_view in ids) {
+  p <- ggplot(data_duration_plot %>%
+                filter(id == id_to_view) %>%
+                filter(Event_Type == "State start"),
+              aes(x = time,
+                  y = Behavior,
+                  group = row_id,
+                  color = dyad_unit)) +
+    geom_line(size = 3) +
+    ggtitle(paste("dyad", id_to_view)) +
+    geom_point(data = data_duration_plot %>%
+                 filter(id == id_to_view) %>%
+                 filter(Event_Type == "State point"),
+               aes(x = time, color = dyad_unit)) +
+    xlab("Time (sec)") +
+    ylab("Behavior") +
+    facet_wrap(vars(dyad_set))
+
+  plot(p)
+}
+```
+
+
+
+# State behaviors
+
+## Time as fraction
+
+
+```{r plot-fraction-states}
+
+ggplot(data_dyad_total_states,
+       aes(x = fct_reorder(Behavior, total_fraction, median, .desc = TRUE),
+           y = total_fraction)) +
+  geom_boxplot(aes(color = dyad_unit)) +
+  coord_flip() +
+  xlab("State behavior") +
+  ylab("Total duration of occurrence in [0, 1]") +
+  facet_wrap(~dyad_set)
+# +
+#  geom_jitter(aes(color = dyad_unit))
+
+```
+
+```{r plot-fraction-bottle}
+
+Bottle_positions <- c("Bottle in mouth",
+                      "Bottle not in mouth",
+                      "Bottle offered")
+
+ggplot(data_dyad_total_states %>%
+         filter(Behavior %in% Bottle_positions),
+       aes(total_fraction, fill = Behavior)) +
+  geom_histogram(aes(y = ..density..)) +
+  xlab("Total duration ([0, 1])") +
+  facet_grid(dyad_set ~ .)
+# +
+#  geom_jitter(aes(color = dyad_unit))
+
+```
+
+```{r summary-fraction, message = FALSE}
+
+data_dyad_total_states %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize_at(vars(total_fraction),
+               list(~length(.), ~mean(.), ~sd(.), ~min(.),
+                    ~median(.), ~max(.))) %>%
+  kable(digits = 3)
+
+```
+
+
+```{r, eval = FALSE, include = FALSE}
+
+ggplot(data_dyad_total_states,
+       aes(total_fraction, fill = Behavior)) +
+  geom_histogram(aes(y = ..density..)) +
+  xlab("Total duration ([0, 1])") +
+  facet_grid(dyad_set ~ .)
+
+```
+
+## Time as seconds
+
+```{r plot-duration}
+
+ggplot(data_dyad_total_states,
+       aes(x = fct_reorder(Behavior, total_duration, median, .desc = TRUE),
+           y = total_duration)) +
+  geom_boxplot(aes(color = dyad_unit)) +
+  coord_flip() +
+  xlab("State behavior") +
+  ylab("Total duration of occurrence (sec)") +
+  facet_wrap(~dyad_set)
+# +
+#  geom_jitter(aes(color = dyad_unit))
+
+
+```
+
+```{r}
+
+ggplot(data_dyad_total_states %>%
+         filter(Behavior %in% Bottle_positions),
+       aes(total_duration, fill = Behavior)) +
+  geom_histogram(aes(y = ..density..)) +
+  xlab("Total duration of occurrence (sec)") +
+  facet_grid(dyad_set ~ .)
+# +
+#  geom_jitter(aes(color = dyad_unit))
+```
+
+
+```{r summary-duration, message = FALSE}
+
+data_dyad_total_states %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize_at(vars(total_duration),
+               list(~length(.), ~mean(.), ~sd(.),
+                    ~min(.), ~median(.), ~max(.))) %>%
+  kable(digits = 1)
+
+```
+
+
+
+```{r, eval = FALSE, include = FALSE}
+
+ggplot(data_dyad_total_states,
+       aes(total_duration, fill = Behavior)) +
+  geom_histogram(aes(y = ..density..)) +
+  xlab("Total duration (sec)") +
+  facet_grid(dyad_set ~ .)
+
+```
+
+
+
+# Point behaviors: counts
+
+
+
+```{r}
+
+ggplot(data_dyad_total_points,
+       aes(x = fct_reorder(Behavior, num_occurrences),
+           y = num_occurrences)) +
+  geom_boxplot(aes(color = dyad_unit)) +
+  coord_flip() +
+  xlab("State point") +
+  ylab("Number of occurrences (per dyad)") +
+  facet_grid(~ dyad_set)
+# +
+#  geom_jitter()
+
+```
+
+
+
+NEED TO FIX THIS TO INCLUDE 0 COUNTS
+
+```{r}
+
+data_dyad_total_points %>%
+  ungroup() %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize_at(vars(num_occurrences),
+               list(~sum(.), ~mean(.), ~sd(.),
+                    ~min(.), ~median(.), ~max(.))) %>%
+  arrange(dyad_set, desc(sum)) %>%
+  kable(digits = 1)
+
+
+```
+
+
+## Grouped behaviors
+
+
+
+```{r}
+
+ggplot(data_dyad_grouped_points %>%
+         filter(dyad_unit == "Mom"),
+       aes(x = fct_reorder(Grouped_behavior, num_occurrences),
+           y = num_occurrences)) +
+  geom_boxplot(aes(color = dyad_unit)) +
+  coord_flip() +
+  xlab("State point") +
+  ylab("Number of occurrences (per dyad)") +
+  facet_wrap(~ dyad_set)
+# +
+#  geom_jitter()
+
+```
+
+
+
+
+
+```{r}
+
+data_dyad_grouped_points %>%
+  ungroup() %>%
+  group_by(dyad_set, Grouped_behavior) %>%
+  summarize_at(vars(num_occurrences),
+               list(~sum(.), ~mean(.), ~sd(.),
+                    ~min(.), ~median(.), ~max(.))) %>%
+  arrange(dyad_set, desc(sum)) %>%
+  kable(digits = 1)
+
+
+```
+
+
+
+
+# Point behaviors: count per video length
+
+
+
+```{r}
+
+ggplot(data_dyad_total_points,
+       aes(x = fct_reorder(Behavior, num_per_length),
+           y = num_per_length)) +
+  geom_boxplot(aes(color = dyad_unit)) +
+  coord_flip() +
+  xlab("State point") +
+  ylab("Number of occurrences / video length (per dyad)") +
+  facet_wrap(~ dyad_set)
+# +
+#  geom_jitter()
+
+```
+
+
+
+
+
+```{r}
+
+data_dyad_total_points %>%
+  ungroup() %>%
+  group_by(dyad_set, Behavior) %>%
+  summarize_at(vars(num_per_length),
+               list(~sum(.), ~mean(.), ~sd(.),
+                    ~min(.), ~median(.), ~max(.))) %>%
+  arrange(dyad_set, desc(sum)) %>%
+  kable(digits = 4)
+
+
+```
+
+## Grouped behaviors
+
+
+```{r}
+
+ggplot(data_dyad_grouped_points %>%
+         filter(dyad_unit == "Mom"),
+       aes(x = fct_reorder(Grouped_behavior, num_per_length),
+           y = num_per_length)) +
+  geom_boxplot(aes(color = dyad_unit)) +
+  coord_flip() +
+  xlab("State point") +
+  ylab("Number of occurrences / video length (per dyad)") +
+  facet_wrap(~ dyad_set)
+# +
+#  geom_jitter()
+
+```
+
+
+```{r}
+
+data_dyad_grouped_points %>%
+  ungroup() %>%
+  group_by(dyad_set, Grouped_behavior) %>%
+  summarize_at(vars(num_per_length),
+               list(~sum(.), ~mean(.), ~sd(.),
+                    ~min(.), ~median(.), ~max(.))) %>%
+  arrange(dyad_set, desc(sum)) %>%
+  kable(digits = 4)
+
+
+```
+
+# Point behaviors: time of occurrence
+
+```{r}
+
+point_times <- data_duration %>%
+  filter(Event_Type == "State point") %>%
+  group_by(id, dyad_set, dyad_unit, Behavior)
+
+ggplot(point_times,
+       aes(x = fct_reorder(Behavior, start_fraction, median, .desc = TRUE),
+                       y = start_fraction)) +
+  geom_boxplot(aes(color = dyad_unit)) +
+  coord_flip() +
+  xlab("Point behavior") +
+  ylab("Time of occurrence in [0, 1]") +
+  facet_wrap(~ dyad_set)
+
+```
+
+## Grouped behaviors
+
+```{r}
+
+point_times <- data_duration %>%
+  filter(Event_Type == "State point") %>%
+  group_by(id, dyad_set, dyad_unit, Grouped_behavior)
+
+ggplot(point_times,
+       aes(x = fct_reorder(Grouped_behavior, start_fraction, median, .desc = TRUE),
+                       y = start_fraction)) +
+  geom_boxplot(aes(color = dyad_unit)) +
+  coord_flip() +
+  xlab("Point behavior group") +
+  ylab("Time of occurrence in [0, 1]") +
+  facet_wrap(~ dyad_set)
+
+```
+
+# Point behaviors: Mom vs Baby total counts
+
+```{r}
+
+dyad_unit_total_points <- data_dyad_total_points %>%
+  ungroup() %>%
+  group_by(dyad_set, id, dyad_unit) %>%
+  summarize(total_point_count = sum(num_occurrences)) %>%
+  pivot_wider(names_from = dyad_unit,
+              values_from = total_point_count)
+
+
+ggplot(dyad_unit_total_points,
+       aes(x = Baby, y = Mom, label = id)) +
+  geom_point() +
+  geom_text(size = 3, hjust = 0, nudge_x = 0.05) +
+  xlab("Total number of point behaviors for Baby") +
+  ylab("Total number of point behaviors for Mom") +
+  facet_wrap(~ dyad_set)
+
+
+```
+
+
+
+```{r}
+
+dyad_unit_total_points_per_length <- data_dyad_total_points %>%
+  ungroup() %>%
+  group_by(dyad_set, id, dyad_unit) %>%
+  summarize(total_point_count_per_length = sum(num_occurrences) / max(video_length)) %>%
+  pivot_wider(names_from = dyad_unit,
+              values_from = total_point_count_per_length)
+
+
+ggplot(dyad_unit_total_points_per_length,
+       aes(x = Baby, y = Mom, label = id)) +
+  geom_point() +
+  geom_text(size = 3, hjust = 0, nudge_x = 0) +
+  xlab("Total number of point behaviors per video length for Baby") +
+  ylab("Total number of point behaviors per video length for Mom") +
+  facet_wrap(~ dyad_set)
+
+
+
+```
+
+
+
+## Log scale
+
+
+```{r}
+
+dyad_unit_total_points <- data_dyad_total_points %>%
+  ungroup() %>%
+  group_by(dyad_set, id, dyad_unit) %>%
+  summarize(total_point_count = sum(num_occurrences)) %>%
+  pivot_wider(names_from = dyad_unit,
+              values_from = total_point_count)
+
+
+ggplot(dyad_unit_total_points,
+       aes(x = Baby, y = Mom, label = id)) +
+  geom_point() +
+  geom_text(size = 3, hjust = 0, nudge_x = 0.05) +
+  scale_y_continuous(trans = "log10") +
+  scale_x_continuous(trans = "log10") +
+  xlab("Total number of point behaviors for Baby (log10)") +
+  ylab("Total number of point behaviors for Mom (log10)") +
+  facet_wrap(~ dyad_set)
+
+
+```
+
+
+
+```{r}
+
+dyad_unit_total_points_per_length <- data_dyad_total_points %>%
+  ungroup() %>%
+  group_by(dyad_set, id, dyad_unit) %>%
+  summarize(total_point_count_per_length = sum(num_occurrences) / max(video_length)) %>%
+  pivot_wider(names_from = dyad_unit,
+              values_from = total_point_count_per_length)
+
+
+ggplot(dyad_unit_total_points_per_length,
+       aes(x = Baby, y = Mom, label = id)) +
+  geom_point() +
+  geom_text(size = 3, hjust = 0, nudge_x = 0) +
+  scale_y_continuous(trans = "log10") +
+  scale_x_continuous(trans = "log10") +
+  xlab("Total number of point behaviors per video length for Baby (log10)") +
+  ylab("Total number of point behaviors per video length for Mom (log10)") +
+  facet_wrap(~ dyad_set)
+
+
+```
+
+
+# Mom responses to infant cues
+
+
+```{r}
+
+data_mom_response <- data_duration %>%
+  ungroup() %>%
+  group_by(dyad_set, id) %>%
+  mutate(next_behavior = dplyr::lead(Grouped_behavior, n = 1, default = NA),
+         next_time = dplyr::lead(time, n = 1, default = NA),
+         next_unit = dplyr::lead(dyad_unit, n = 1, default = NA)) %>%
+  filter(!Behavior %in% c("Eyes Open", "Not Crying")) %>%
+  filter(!Grouped_behavior %in% c("Propped bottle", "Looks at phone or device")) %>%
+  filter(dyad_unit == "Baby") %>%
+  mutate(mom_response = as_factor(if_else(next_unit == "Baby",
+                                          "No response",
+                                          as.character(next_behavior)))) %>%
+  mutate(response_time = next_time - time) %>%
+  mutate(Behavior = fct_infreq(Behavior)) %>%
+  ungroup() %>%
+  mutate(mom_response2 = fct_lump_n(mom_response, 5)) %>%
+  group_by(dyad_set, id)
+
+
+
+ggplot(data_mom_response) +
+  geom_mosaic(aes(x = product(mom_response2, Behavior),
+                  fill=mom_response2), na.rm = TRUE) +
+  facet_grid(rows = vars(dyad_set)) +
+  scale_y_productlist() +
+  scale_x_productlist() +
+  labs(x = "Infant cue", y = "Mom response",
+       title='')
+
+# write.csv(data_mom_response, "data-mom-response.csv")
+
+```
+
+
+## Mom response time for each infant cue
+
+
+```{r, response-plot, animation.hook="gifski", interval=2.5, fig.width=10, cache = TRUE}
+
+for (cue in cues) {
+  p <- ggplot(data_mom_response %>%
+                filter(Behavior == cue) %>%
+                filter(!is.na(response_time)),
+              aes(x = fct_reorder(mom_response2, response_time, median, .desc = TRUE),
+                  y = response_time)) +
+    geom_boxplot() +
+    coord_flip() +
+    xlab("Mom response") +
+    ylab("Response time (sec)") +
+    ggtitle(paste("Infant cue:", cue)) +
+    facet_wrap(~dyad_set)
+
+  plot(p)
+}
+```
+
+## Mom response time for each infant cue: constant time axis
+
+```{r, response-plot-fixed, animation.hook="gifski", interval=2.5, fig.width=10, cache = TRUE}
+
+max_time = max(data_mom_response$response_time, na.rm = TRUE)
+
+for (cue in cues) {
+  p <- ggplot(data_mom_response %>%
+                filter(Behavior == cue) %>%
+                filter(!is.na(response_time)),
+              aes(x = fct_reorder(mom_response2, response_time, median, .desc = TRUE),
+                  y = response_time)) +
+    geom_boxplot() +
+    ylim(0, max_time) +
+    coord_flip() +
+    xlab("Mom response") +
+    ylab("Response time (sec)") +
+    ggtitle(paste("Infant cue:", cue)) +
+    facet_wrap(~dyad_set)
+
+  plot(p)
+}
+```
+

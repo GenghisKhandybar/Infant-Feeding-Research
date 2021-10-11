@@ -18,15 +18,26 @@ source("shared_setup.R")
 
 
 ```{r}
+# data_duration <- data_duration %>%
+#   mutate(Behavior = as.factor(Behavior))
+
 interaction_data <- data_duration %>% 
   filter(!is.na(next_group_narrow)) %>% # if the narrow group of the next behavior was NA, i took it out for these summaries.
   filter(bottle_state == "Bottle offered",
          dyad_unit == "Baby")
+  
+
+# UPDATE1: had to update the behavior order to keep the tables from displaying all of the behaviors in the original behavior order from the shared_setup
+
+new_behavior_order <- behavior_order[behavior_order %in% interaction_data$Behavior]
+
+interaction_data <- interaction_data %>%
+  mutate(Behavior = factor(Behavior, levels = new_behavior_order))
 ```
 
 ## a,b) How often does this lead to a controlling maternal behavior? How often does this lead to responsive behaviors?
 
-#### For All Dyad Sets
+### For All Dyad Sets
 
 ```{r}
 
@@ -75,6 +86,10 @@ interaction_data %>%
 specific_behavior <- interaction_data %>%
   filter(Behavior == "Lip compression/does not open mouth" |
          Behavior == "Blocks mouth with hands or feet")
+
+specific_behavior_order <- behavior_order[behavior_order %in% specific_behavior$Behavior]
+specific_behavior <- specific_behavior %>%
+  mutate(Behavior = factor(Behavior, levels = specific_behavior_order))
   
 with(specific_behavior, prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "Proportion of Behaviors for Lip Compression \nand Blocks mouth when State is Bottle Offered",
@@ -98,7 +113,7 @@ with(interaction_data, prop.table(table(Behavior, next_behavior),1)) %>%
 
 
 
-#### By Dyad Set
+### By Dyad Set
 
 
 ```{r}
@@ -116,16 +131,16 @@ interaction_data %>%
   facet_grid(~ dyad_set)
 
 # still looking for a better solution for a table
-with(interaction_data[interaction_data$dyad_set == "2wkB",], table(Behavior, next_group_narrow)) %>%
+with(interaction_data[interaction_data$dyad_set == "2 weeks",], table(Behavior, next_group_narrow)) %>%
   kable(caption = "2 Week - Number of Behaviors for each \nInfant Cue when State is Bottle Offered")
 
-with(interaction_data[interaction_data$dyad_set == "2moB",], table(Behavior, next_group_narrow)) %>%
+with(interaction_data[interaction_data$dyad_set == "2 months",], table(Behavior, next_group_narrow)) %>%
   kable(caption = "2 Month - Number of Behaviors for each \nInfant Cue when State is Bottle Offered")
 
-with(interaction_data[interaction_data$dyad_set == "4moB",], table(Behavior, next_group_narrow)) %>%
+with(interaction_data[interaction_data$dyad_set == "4 months",], table(Behavior, next_group_narrow)) %>%
   kable(caption = "4 Month - Number of Behaviors for each \nInfant Cue when State is Bottle Offered")
 
-with(interaction_data[interaction_data$dyad_set == "6moB",], table(Behavior, next_group_narrow)) %>%
+with(interaction_data[interaction_data$dyad_set == "6 months",], table(Behavior, next_group_narrow)) %>%
   kable(caption = "6 Month - Number of Behaviors for each \nInfant Cue when State is Bottle Offered")
 
 
@@ -143,16 +158,16 @@ interaction_data %>%
   facet_grid(~ dyad_set)
 
 
-with(interaction_data[interaction_data$dyad_set == "2wkB",], prop.table(table(Behavior, next_group_narrow),1)) %>%
+with(interaction_data[interaction_data$dyad_set == "2 weeks",], prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "2 Week - Proportion of Behaviors for each \nInfant Cue when State is Bottle Offered")
 
-with(interaction_data[interaction_data$dyad_set == "2moB",], prop.table(table(Behavior, next_group_narrow),1)) %>%
+with(interaction_data[interaction_data$dyad_set == "2 months",], prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "2 Month - Proportion of Behaviors for each \nInfant Cue when State is Bottle Offered")
 
-with(interaction_data[interaction_data$dyad_set == "4moB",], prop.table(table(Behavior, next_group_narrow),1)) %>%
+with(interaction_data[interaction_data$dyad_set == "4 months",], prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "4 Month - Proportion of Behaviors for each \nInfant Cue when State is Bottle Offered")
 
-with(interaction_data[interaction_data$dyad_set == "6moB",], prop.table(table(Behavior, next_group_narrow),1)) %>%
+with(interaction_data[interaction_data$dyad_set == "6 months",], prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "6 Month - Proportion of Behaviors for each \nInfant Cue when State is Bottle Offered")
 
 interaction_data %>%
@@ -170,28 +185,34 @@ interaction_data %>%
   theme(plot.title = element_text(size=12)) +
   facet_grid(~ dyad_set)
 
+
+
 with(interaction_data %>% filter(
-        dyad_set == "2wkB",
+        dyad_set == "2 weeks",
          Behavior == "Lip compression/does not open mouth" |
-         Behavior == "Blocks mouth with hands or feet"), prop.table(table(Behavior, next_group_narrow),1)) %>%
+         Behavior == "Blocks mouth with hands or feet") %>%
+  mutate(Behavior = factor(Behavior, levels = specific_behavior_order)), prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "2 Week - Proportion of Behaviors for \nLip compression does not open mouth and Blocks mouth")
 
 with(interaction_data %>% filter(
-        dyad_set == "2moB",
+        dyad_set == "2 months",
          Behavior == "Lip compression/does not open mouth" |
-         Behavior == "Blocks mouth with hands or feet"), prop.table(table(Behavior, next_group_narrow),1)) %>%
+         Behavior == "Blocks mouth with hands or feet") %>%
+  mutate(Behavior = factor(Behavior, levels = specific_behavior_order)), prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "2 Month - Proportion of Behaviors for \nLip compression does not open mouth and Blocks mouth")
 
 with(interaction_data %>% filter(
-        dyad_set == "4moB",
+        dyad_set == "4 months",
          Behavior == "Lip compression/does not open mouth" |
-         Behavior == "Blocks mouth with hands or feet"), prop.table(table(Behavior, next_group_narrow),1)) %>%
+         Behavior == "Blocks mouth with hands or feet") %>%
+  mutate(Behavior = factor(Behavior, levels = specific_behavior_order)), prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "4 Month - Proportion of Behaviors for \nLip compression does not open mouth and Blocks mouth")
 
 with(interaction_data %>% filter(
-        dyad_set == "6moB",
+        dyad_set == "6 months",
          Behavior == "Lip compression/does not open mouth" |
-         Behavior == "Blocks mouth with hands or feet"), prop.table(table(Behavior, next_group_narrow),1)) %>%
+         Behavior == "Blocks mouth with hands or feet") %>%
+  mutate(Behavior = factor(Behavior, levels = specific_behavior_order)), prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "6 Month - Proportion of Behaviors for \nLip compression does not open mouth and Blocks mouth")
 
 interaction_data %>%
@@ -207,16 +228,17 @@ interaction_data %>%
   theme(plot.title = element_text(size=12)) +
   facet_grid(~ dyad_set)
 
-with(interaction_data[interaction_data$dyad_set == "2wkB",], prop.table(table(Behavior, next_behavior),1)) %>%
+
+with(interaction_data[interaction_data$dyad_set == "2 weeks",], prop.table(table(Behavior, next_behavior),1)) %>%
   kable(caption = "2 Week - Proportion of Behaviors for each \nInfant Cue when State is Bottle Offered")
 
-with(interaction_data[interaction_data$dyad_set == "2moB",], prop.table(table(Behavior, next_behavior),1)) %>%
+with(interaction_data[interaction_data$dyad_set == "2 months",], prop.table(table(Behavior, next_behavior),1)) %>%
   kable(caption = "2 Month - Proportion of Behaviors for each \nInfant Cue when State is Bottle Offered")
 
-with(interaction_data[interaction_data$dyad_set == "4moB",], prop.table(table(Behavior, next_behavior),1)) %>%
+with(interaction_data[interaction_data$dyad_set == "4 months",], prop.table(table(Behavior, next_behavior),1)) %>%
   kable(caption = "4 Month - Proportion of Behaviors for each \nInfant Cue when State is Bottle Offered")
 
-with(interaction_data[interaction_data$dyad_set == "6moB",], prop.table(table(Behavior, next_behavior),1)) %>%
+with(interaction_data[interaction_data$dyad_set == "6 months",], prop.table(table(Behavior, next_behavior),1)) %>%
   kable(caption = "6 Month - Proportion of Behaviors for each \nInfant Cue when State is Bottle Offered")
 ```
 
@@ -315,9 +337,6 @@ bottle_offers %>%
 # interaction_data %>%
 #   filter(id == 70346) %>%
 #   select(Behavior,time,dyad_set,id)
-
-interaction_data2 %>%
-  filter(Behavior == "Indicates feeding is over")
 ```
 
 
@@ -351,11 +370,20 @@ bottle_offers %>%
 
 ## a,b) How often does this lead to a controlling maternal behavior? How often does this lead to responsive behaviors?
 
+### For All Dyad Sets
+
 ```{r}
 interaction_data4 <- data_duration %>% 
   filter(!is.na(next_group_narrow)) %>% # if the narrow group of the next behavior was NA, i took it out for these summaries.
   filter(bottle_state == "Bottle not in mouth",
          dyad_unit == "Baby")
+
+new_behavior_order4 <- behavior_order[behavior_order %in% interaction_data4$Behavior]
+
+interaction_data4 <- interaction_data4 %>%
+  mutate(Behavior = factor(Behavior, levels = new_behavior_order4))
+
+
 
 interaction_data4 %>%
   select(dyad_unit, bottle_state, Behavior, next_behavior, next_group_narrow) %>%
@@ -402,6 +430,9 @@ interaction_data4 %>%
 specific_behavior <- interaction_data4 %>%
   filter(Behavior == "Lip compression/does not open mouth" |
          Behavior == "Blocks mouth with hands or feet")
+
+specific_behavior <- specific_behavior %>%
+  mutate(Behavior = factor(Behavior, levels = specific_behavior_order))
   
 with(specific_behavior, prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "Proportion of Behaviors for Lip Compression \nand Blocks mouth when State is Bottle not in Mouth",
@@ -417,16 +448,15 @@ interaction_data4 %>%
   coord_flip() +
   ggtitle("Proportion of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")+
   theme(plot.title = element_text(size=12)) + 
-  scale_fill_manual(values=c("antiquewhite", "aquamarine", "azure3", "blue", 
-                             "brown", "burlywood", "cadetblue", "darkseagreen", 
-                             "chocolate1", "darkgoldenrod", "darkgreen", "darkmagenta",
-                             "darkolivegreen1", "hotpink1"))
+  scale_fill_manual(values=c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
+                "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888", "sienna1", "seagreen2"))
 
 with(interaction_data4, prop.table(table(Behavior, next_behavior),1)) %>%
   kable(caption = "Proportion of Behaviors for each \nInfant Cue when State is Bottle not in Mouth",
         digits = 3)
 ```
 
+### By Dyad Set
 
 ```{r}
 interaction_data4 %>%
@@ -441,16 +471,16 @@ interaction_data4 %>%
   facet_grid(~ dyad_set)
 
 # still looking for a better solution for a table
-with(interaction_data4[interaction_data4$dyad_set == "2wkB",], table(Behavior, next_group_narrow)) %>%
+with(interaction_data4[interaction_data4$dyad_set == "2 weeks",], table(Behavior, next_group_narrow)) %>%
   kable(caption = "2 Week - Number of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")
 
-with(interaction_data4[interaction_data4$dyad_set == "2moB",], table(Behavior, next_group_narrow)) %>%
+with(interaction_data4[interaction_data4$dyad_set == "2 months",], table(Behavior, next_group_narrow)) %>%
   kable(caption = "2 Month - Number of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")
 
-with(interaction_data4[interaction_data4$dyad_set == "4moB",], table(Behavior, next_group_narrow)) %>%
+with(interaction_data4[interaction_data4$dyad_set == "4 months",], table(Behavior, next_group_narrow)) %>%
   kable(caption = "4 Month - Number of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")
 
-with(interaction_data4[interaction_data4$dyad_set == "6moB",], table(Behavior, next_group_narrow)) %>%
+with(interaction_data4[interaction_data4$dyad_set == "6 months",], table(Behavior, next_group_narrow)) %>%
   kable(caption = "6 Month - Number of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")
 
 
@@ -466,16 +496,16 @@ interaction_data4 %>%
   facet_grid(~ dyad_set)
 
 
-with(interaction_data4[interaction_data4$dyad_set == "2wkB",], prop.table(table(Behavior, next_group_narrow),1)) %>%
+with(interaction_data4[interaction_data4$dyad_set == "2 weeks",], prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "2 Week - Proportion of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")
 
-with(interaction_data4[interaction_data4$dyad_set == "2moB",], prop.table(table(Behavior, next_group_narrow),1)) %>%
+with(interaction_data4[interaction_data4$dyad_set == "2 months",], prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "2 Month - Proportion of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")
 
-with(interaction_data4[interaction_data4$dyad_set == "4moB",], prop.table(table(Behavior, next_group_narrow),1)) %>%
+with(interaction_data4[interaction_data4$dyad_set == "4 months",], prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "4 Month - Proportion of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")
 
-with(interaction_data4[interaction_data4$dyad_set == "6moB",], prop.table(table(Behavior, next_group_narrow),1)) %>%
+with(interaction_data4[interaction_data4$dyad_set == "6 months",], prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "6 Month - Proportion of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")
 
 interaction_data4 %>%
@@ -492,27 +522,31 @@ interaction_data4 %>%
   facet_grid(~ dyad_set)
 
 with(interaction_data4 %>% filter(
-        dyad_set == "2wkB",
+        dyad_set == "2 weeks",
          Behavior == "Lip compression/does not open mouth" |
-         Behavior == "Blocks mouth with hands or feet"), prop.table(table(Behavior, next_group_narrow),1)) %>%
+         Behavior == "Blocks mouth with hands or feet") %>%
+  mutate(Behavior = factor(Behavior, levels = specific_behavior_order)), prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "2 Week - Proportion of Behaviors for \nLip compression does not open mouth and Blocks mouth")
 
 with(interaction_data4 %>% filter(
-        dyad_set == "2moB",
+        dyad_set == "2 months",
          Behavior == "Lip compression/does not open mouth" |
-         Behavior == "Blocks mouth with hands or feet"), prop.table(table(Behavior, next_group_narrow),1)) %>%
+         Behavior == "Blocks mouth with hands or feet") %>%
+  mutate(Behavior = factor(Behavior, levels = specific_behavior_order)), prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "2 Month - Proportion of Behaviors for \nLip compression does not open mouth and Blocks mouth")
 
 with(interaction_data4 %>% filter(
-        dyad_set == "4moB",
+        dyad_set == "4 months",
          Behavior == "Lip compression/does not open mouth" |
-         Behavior == "Blocks mouth with hands or feet"), prop.table(table(Behavior, next_group_narrow),1)) %>%
+         Behavior == "Blocks mouth with hands or feet") %>%
+  mutate(Behavior = factor(Behavior, levels = specific_behavior_order)), prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "4 Month - Proportion of Behaviors for \nLip compression does not open mouth and Blocks mouth")
 
 with(interaction_data4 %>% filter(
-        dyad_set == "6moB",
+        dyad_set == "6 months",
          Behavior == "Lip compression/does not open mouth" |
-         Behavior == "Blocks mouth with hands or feet"), prop.table(table(Behavior, next_group_narrow),1)) %>%
+         Behavior == "Blocks mouth with hands or feet") %>%
+  mutate(Behavior = factor(Behavior, levels = specific_behavior_order)), prop.table(table(Behavior, next_group_narrow),1)) %>%
   kable(caption = "6 Month - Proportion of Behaviors for \nLip compression does not open mouth and Blocks mouth")
 
 interaction_data4 %>%
@@ -524,22 +558,20 @@ interaction_data4 %>%
   coord_flip() +
   ggtitle("Proportion of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")+
   theme(plot.title = element_text(size=12)) +
-  scale_fill_manual(values=c("antiquewhite", "aquamarine", "azure3", "blue", 
-                             "brown", "burlywood", "cadetblue", "darkseagreen", 
-                             "chocolate1", "darkgoldenrod", "darkgreen", "darkmagenta",
-                             "darkolivegreen1", "hotpink1")) +
+  scale_fill_manual(values=c("#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499", 
+                "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888", "sienna1", "seagreen2")) +
   facet_grid(~ dyad_set)
 
-with(interaction_data4[interaction_data4$dyad_set == "2wkB",], prop.table(table(Behavior, next_behavior),1)) %>%
+with(interaction_data4[interaction_data4$dyad_set == "2 weeks",], prop.table(table(Behavior, next_behavior),1)) %>%
   kable(caption = "2 Week - Proportion of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")
 
-with(interaction_data4[interaction_data4$dyad_set == "2moB",], prop.table(table(Behavior, next_behavior),1)) %>%
+with(interaction_data4[interaction_data4$dyad_set == "2 months",], prop.table(table(Behavior, next_behavior),1)) %>%
   kable(caption = "2 Month - Proportion of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")
 
-with(interaction_data4[interaction_data4$dyad_set == "4moB",], prop.table(table(Behavior, next_behavior),1)) %>%
+with(interaction_data4[interaction_data4$dyad_set == "4 months",], prop.table(table(Behavior, next_behavior),1)) %>%
   kable(caption = "4 Month - Proportion of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")
 
-with(interaction_data4[interaction_data4$dyad_set == "6moB",], prop.table(table(Behavior, next_behavior),1)) %>%
+with(interaction_data4[interaction_data4$dyad_set == "6 months",], prop.table(table(Behavior, next_behavior),1)) %>%
   kable(caption = "6 Month - Proportion of Behaviors for each \nInfant Cue when State is Bottle not in Mouth")
 ```
 
