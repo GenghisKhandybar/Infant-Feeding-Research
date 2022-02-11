@@ -20,6 +20,22 @@ data_4mo <- read_csv("data-4moB.csv")
 data_6mo <- read_csv("data-6moB.csv")
 ```
 
+```{r bottle_emptying}
+#Bottle emptying data is included in the raw data files, but is now replaced with updated values.
+
+bottle_emptying_data <- read_csv("emptying_codes.csv") %>% 
+  rename(dyad_set = Dyad_set,
+         Bottle_Emptying = emptying) %>% 
+  mutate(id = as.factor(id),
+         dyad_set = as.factor(dyad_set),
+         Bottle_Emptying = as.factor(Bottle_Emptying))
+
+bottle_emptying_data %>% filter(is.na(Coder)) #One NA coder?
+
+bottle_emptying_data <- bottle_emptying_data %>% 
+  select(-Coder) #Coder does not seem to be a useful addition from this source.
+```
+
 ```{r}
 all_data <- rbind(data_2wk, data_2mo, data_4mo, data_6mo) 
 
@@ -72,14 +88,15 @@ all_data <- all_data %>%
                             "Blocks mouth with hands or feet")) %>%
   left_join(behavior_codebook%>% 
                          select(-Event_Type, -dyad_unit)
-            , by=c("Behavior"))
+            , by=c("Behavior")) %>% 
+  left_join(bottle_emptying_data)
 
 all_data %>%
   filter(Behavior == "Displays negative facial expression")
 ```
 
 
-```{r}
-write.csv(all_data, "./all_data.csv", row.names = FALSE)
+```{r save_csv}
+write.csv(all_data, "./all_data.csv", row.names = FALSE) #Creates all_data.csv in the main folder.
 ```
 
