@@ -88,13 +88,16 @@ data <- read_csv("all_data.csv") %>% #Groups are added by left_join in code chun
   # #        Wide_grouped_behavior = fct_recode(Behavior, !!!behaviors_wide),
   # #        Narrow_grouped_behavior = fct_recode(Behavior, !!!behaviors_narrow)
   # #        ) %>%
-  # rename("id" = "ID_Number",
-  #        "coder_id" = "Coder") %>%
+   rename("id" = "ID_Number",
+          "coder_id" = "Coder") %>%
+  mutate(
+    id = factor(id),
+    dyad_set = factor(dyad_set)) %>% 
   mutate(
     Time_Relative_sf = as.double(Time_Relative_sf),
     Duration_sf = as.double(Duration_sf),
     Comment = as.logical(Comment),
-    id = factor(id),
+    
     Position_of_Infant = as.integer(Position_of_Infant),
     time = as.double(time),
     duration = as.double(duration),
@@ -103,7 +106,8 @@ data <- read_csv("all_data.csv") %>% #Groups are added by left_join in code chun
     dyad_set = factor(dyad_set, levels = dyad_set_levels),
     Bottle_Rejector = replace_na(Bottle_Rejector, 0),
     Bottle_Rejector = factor(Bottle_Rejector)
-  )
+  ) %>% 
+  left_join(behavior_codebook %>% select(Behavior, Narrow_group, Wide_group, Grouped_behavior), by = "Behavior") #Adding in grouped columns - considering moving this to creating-all-data.rmd.
 ```
 
 
