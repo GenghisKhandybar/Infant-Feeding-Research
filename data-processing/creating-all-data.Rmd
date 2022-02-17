@@ -83,6 +83,7 @@ behaviors <- left_join(behaviors,
 )
 
 all_data <- all_data %>%
+  select(-Result_Container) %>% 
   mutate(Behavior = replace(Behavior,
                             Behavior == "Blocks mouth",
                             "Blocks mouth with hands or feet")) %>%
@@ -91,8 +92,8 @@ all_data <- all_data %>%
             , by=c("Behavior")) %>% 
   left_join(bottle_emptying_data)
 
-all_data %>%
-  filter(Behavior == "Displays negative facial expression")
+#all_data %>%
+#  filter(Behavior == "Displays negative facial expression")
 ```
 
 
