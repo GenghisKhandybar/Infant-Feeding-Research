@@ -83,11 +83,9 @@ data_duration <- data_duration %>%
          Behavior = factor(Behavior, levels = behavior_order)) %>%
   filter(Bottle_Rejector %in% include_rejectors)
 
-# Reading data (used in descriptive-statistics-summer2020) -------------------
+# Reading data (used in descriptive-statistics-summer2020, Modeling) -------------------
 
 data <- read_csv("all_data.csv") %>% 
-  # rename("id" = "ID_Number",
-  #        "coder_id" = "Coder") %>%
   mutate(
     Time_Relative_sf = as.double(Time_Relative_sf),
     Duration_sf = as.double(Duration_sf),
