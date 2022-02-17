@@ -88,8 +88,6 @@ data <- read_csv("all_data.csv") %>% #Groups are added by left_join in code chun
   # #        Wide_grouped_behavior = fct_recode(Behavior, !!!behaviors_wide),
   # #        Narrow_grouped_behavior = fct_recode(Behavior, !!!behaviors_narrow)
   # #        ) %>%
-   rename("id" = "ID_Number",
-          "coder_id" = "Coder") %>%
   mutate(
     id = factor(id),
     dyad_set = factor(dyad_set)) %>% 
@@ -106,8 +104,7 @@ data <- read_csv("all_data.csv") %>% #Groups are added by left_join in code chun
     dyad_set = factor(dyad_set, levels = dyad_set_levels),
     Bottle_Rejector = replace_na(Bottle_Rejector, 0),
     Bottle_Rejector = factor(Bottle_Rejector)
-  ) %>% 
-  left_join(behavior_codebook %>% select(Behavior, Narrow_group, Wide_group, Grouped_behavior), by = "Behavior") #Adding in grouped columns - considering moving this to creating-all-data.rmd.
+  )
 ```
 
 
@@ -667,6 +664,7 @@ quarterly_data <- data_duration %>%
             video_length = max(video_length)) %>%
   mutate(num_per_length = num_occurrences / video_length) %>%
   distinct() # because there are duplicate rows
+
 # example// if there are 3 occurences of Burping in quarter 2 for a dyad_set / id combo, it will display that row 3 times to indicate the 3 occurences
 # using disitinct gets rid of the duplicate rows.
 
@@ -688,8 +686,36 @@ quarterly_data <- data_duration %>%
 #   mutate(video_length = max(video_length))
 
 write.csv(quarterly_data,
-          "data-quarterly.csv",
+          "quarterly-data.csv",
           row.names = FALSE)
 ```
 
+```{r halved_data}
+halved_data <- data_duration %>%
+  group_by(dyad_set, id) %>%
+  mutate(quarter = case_when(time < (video_length / 4) ~ 1,
+                             time < 2*(video_length / 4) & time >= (video_length / 4) ~ 2,
+                             time < 3*(video_length / 4) & time >= 2*(video_length / 4) ~ 3,
+                             time >= 3*(video_length / 4) ~ 4)) %>%
+  mutate(half = case_when(time < (video_length / 2) ~ 1,
+                          time >= 2*(video_length / 4) ~ 2
+                          )) %>%
+  ungroup() %>%
+  group_by(dyad_set, id, Behavior, half) %>%
+  summarize(Bottle_Rejector = first(Bottle_Rejector),
+            Event_Type = first(Event_Type),
+            dyad_unit = first(dyad_unit),
+            Grouped_behavior = first(Grouped_behavior),
+            total_fraction = sum(duration_fraction), 
+            total_duration = sum(duration),
+            quarter = as.factor(quarter),
+            num_occurrences = n(),
+            video_length = max(video_length)) %>%
+  mutate(num_per_length = num_occurrences / video_length) %>%
+  distinct() # because there are duplicate rows
+
+write.csv(halved_data,
+          "halved-data.csv",
+          row.names = FALSE)
+```
 
