@@ -261,6 +261,7 @@ time_interactions <- data_duration %>%
 
 p <- time_interactions %>% 
   filter(dyad_unit == "Baby") %>% 
+  filter(num_count > 5) %>% 
   ggplot(aes(y = Narrow_group,
              x = next_group_narrow,
              col = med_time,
@@ -279,12 +280,14 @@ p <- time_interactions %>%
   facet_grid(cols = vars(dyad_set)) +
   ylab("Original behavior") +
   xlab("Response to behavior") +
-  ggtitle("Baby cue response times")
+  ggtitle("Baby cue response times (for n > 5 occurences)")
 
-p# %>% ggplotly(tooltip = "text")
+p %>% ggplotly(tooltip = "text")
 
+#For this plot, display colors as inverted time? Scale would be better but less easy to interpret.
 p <- time_interactions %>% 
   filter(dyad_unit == "Mom") %>% 
+  filter(num_count > 5) %>% 
   ggplot(aes(y = Narrow_group,
              x = next_group_narrow,
              col = med_time,
@@ -303,7 +306,7 @@ p <- time_interactions %>%
   facet_grid(cols = vars(dyad_set)) +
   ylab("Original behavior") +
   xlab("Response to behavior") +
-  ggtitle("Mom behavior response times")
+  ggtitle("Mom behavior response times (for n > 5 occurences)")
 
 p# %>% ggplotly(tooltip = "text")
 ```
