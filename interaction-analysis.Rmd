@@ -174,7 +174,9 @@ infant_interactions %>%
 ```{r}
 infant_interactions <- data_duration %>% 
   mutate(next_behavior = get_group(next_behavior, "narrow")) %>% 
-  process_interactions("Baby", "dyad_set")
+  process_interactions("Baby", "dyad_set") %>% 
+  filter(next_behavior != "Uninvolved")
+  
 
 responses <- behavior_codebook %>% filter(dyad_unit == "Mom") %>% pull(Narrow_group)
 
@@ -234,8 +236,8 @@ infant_interactions <- data_duration %>%
 responses <- behavior_codebook %>% filter(dyad_unit == "Baby") %>% pull(Narrow_group)
 
 p <- infant_interactions %>% 
-  heat_plot(responses, "First responses to mother behaviors (by category)") + facet_grid(cols = vars(dyad_set))
-p %>% ggplotly(tooltip = "text")
+  heat_plot(responses, "First responses to mother behaviors (Subtle Cues)") + facet_grid(cols = vars(dyad_set))
+p # %>% ggplotly(tooltip = "text")
 
 infant_interactions %>% 
   heat_table(responses, "dyad_set") %>% 
