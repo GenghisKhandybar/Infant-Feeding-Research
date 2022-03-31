@@ -136,7 +136,7 @@ df_points %>%
 states <- data_duration %>%
   filter(dyad_unit == "Mom") %>% 
   filter(!(Behavior %in% bottle_states)) %>% 
-  filter(Narrow_group!="Baseline") %>%
+  filter(Narrow_group!="Other mother behavior") %>%
   filter(Event_Type == "State start") %>% 
   distinct(Behavior) %>% 
   pull()

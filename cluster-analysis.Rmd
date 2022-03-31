@@ -75,8 +75,8 @@ data_dyad_total_zeros_clusters <- data_dyad_total_zeros %>%
   left_join(dyad_cluster_by_set, x_names = c(dyad_set, id), y_names = c(dyad_set, id))
 
 p <- data_dyad_total_zeros_clusters %>% 
-    filter(Wide_group != "Baseline") %>% 
-    group_by(Narrow_group, cluster) %>% # , dyad_set) %>% 
+    filter(Wide_group != "Other infant behavior") %>% 
+    group_by(Narrow_group, cluster) %>%
     summarise(n_occurrences = sum(if_else(num_occurrences > 0, 1, 0)),
               n = n()) %>% 
     mutate(prop = n_occurrences / n) %>% 
