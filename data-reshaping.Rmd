@@ -162,7 +162,7 @@ data_duration <- data_duration %>%
          bout_code = cumsum(new_bottle_state)) %>% 
   ungroup() %>% 
   group_by(dyad_set, id, bout_code) %>% 
-  mutate(bottle_state = if_else(first(Behavior) %in% bottle_states, first(Behavior), NULL)) %>% 
+  mutate(bottle_state = if_else(time > 0, first(Behavior), "Bottle not in mouth")) %>% #Code start time:bottle not in mouth
   ungroup() %>% 
   select(-bout_code, -new_bottle_state) %>%  
   group_by(id, dyad_set) %>% #create next_behavior and next_time
