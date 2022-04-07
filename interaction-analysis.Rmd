@@ -50,31 +50,45 @@ p
 <!-- interaction_data is now included in data_duration -->
 
 ```{r heat_plot_function}
-process_interactions <- function(data_duration, dyad_unit_response, facet){
+process_interactions <- function(data_duration, 
+                                 dyad_unit_response, # Mom or baby, whose behaviors are we looking for?
+                                 facet # Another variable to categorize by.
+                                 ){
+  # Example
+  #dyad_unit_response = "Mom"
+  #facet = "bottle_state"
   
+  # data_processed tallies the number of A -> B interactions. 
+  # Note that next_behavior is not the behavior on the next line, but the next behavior of the other party.
+  # For example, if the baby gives 5 cues, then the mother inserts the bottle, next_behavior will be Bottle In Mouth for all 5 cues.
+  # It only contains a row for each combination observed at least once.
   data_processed <- data_duration %>% 
     filter(dyad_unit == dyad_unit_response) %>%
     filter(!is.na(next_behavior)) %>% 
     filter(Time_Relative_sf > 0) %>% #Starting conditions don't really count
-    group_by(Behavior, next_behavior, !!as.name(facet)) %>% 
-    #group_by(across(all_of(c("Behavior", "next_behavior", facet)))) %>% 
+    group_by(Behavior, next_behavior, !!as.name(facet)) %>%
     summarise(num_count = n(),
             q1_time = quantile(time_until_next, 0.25),
             med_time = median(time_until_next),
             q3_time = quantile(time_until_next, 0.75)) %>% 
     ungroup()
   
+  # The rest of the code just creates "0" rows for A -> B interactions that were never observed.
+  # To ensure a row for every combination of A -> B interactions, we create a data frame all_combos of every combination. 
   all_combos <- expand.grid(Behavior = data_processed %>% distinct(Behavior) %>% pull(),
                             next_behavior = data_processed %>% distinct(next_behavior) %>% pull(),
-                            facet_place = data_processed %>% distinct(!!as.name(facet)) %>% pull())
-  
+                            facet_place = data_processed %>% distinct(!!as.name(facet)) %>% pull()) #Grabs the desired facet but it's named "facet_place"
+  # Resets facet's name from facet_place to its original variable name.
   names(all_combos)[names(all_combos) == "facet_place"] <- facet
   
+  # Final grouped data columns:
+  # num_count: observed combinations of exact A -> B interaction (grouped by facet)
+  # n_total: number of behavior A observed (grouped by facet)
+  # following_prop: what proportion of behavior A was followed by response B (grouped by facet)
   data_processed %>%
     right_join(all_combos, on = c(Behavior, next_behavior, !!as.name(facet))) %>% 
     group_by(Behavior, !!as.name(facet)) %>% 
-    mutate(across(c(num_count, q1_time, med_time, q3_time), .fns = ~replace_na(.,0))) %>% 
-    #group_by(across(all_of(c("Behavior", facet)))) %>% 
+    mutate(across(c(num_count, q1_time, med_time, q3_time), .fns = ~replace_na(.,0))) %>%  #Fill stats columns with 0 where no interactions were observed.
     mutate(following_prop = num_count / sum(num_count),
            n_total = sum(num_count)) %>%
     mutate(following_prop = replace_na(following_prop, 0)) %>% 
@@ -82,6 +96,7 @@ process_interactions <- function(data_duration, dyad_unit_response, facet){
 }
 
 #Faceted on dyad_set and bottle_state
+#Same function as above, but doesn't require an additional variable to split by.
 process_interactions_full_facet <- function(data_duration, dyad_unit_response){
   
   data_processed <- data_duration %>% 
@@ -104,7 +119,6 @@ process_interactions_full_facet <- function(data_duration, dyad_unit_response){
     right_join(all_combos, on = c(Behavior, next_behavior, dyad_set, bottle_state)) %>% 
     group_by(Behavior, dyad_set, bottle_state) %>% 
     mutate(across(c(num_count, q1_time, med_time, q3_time), .fns = ~replace_na(.,0))) %>% 
-    #group_by(across(all_of(c("Behavior", facet)))) %>% 
     mutate(following_prop = num_count / sum(num_count),
            n_total = sum(num_count)) %>%
     mutate(following_prop = replace_na(following_prop, 0)) %>% 
