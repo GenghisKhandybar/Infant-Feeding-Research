@@ -37,7 +37,8 @@ bottle_emptying_data <- bottle_emptying_data %>%
 ```
 
 ```{r}
-all_data <- rbind(data_2wk, data_2mo, data_4mo, data_6mo) 
+all_data <- rbind(data_2wk, data_2mo, data_4mo, data_6mo) %>% 
+  filter(ID_Number != 70397) #70397 is twins with 70396, and was therefore randomly selected to be removed to avoid over-emphasizing their common traits.
 
 # Vectorized sequence function
 # seq_vec(x, y) = c(x[1]:y[1], x[2]:y[2], ...)
