@@ -463,14 +463,19 @@ infant_immediate_next %>%
   ggplot(aes(x = Narrow_group, fill = immediate_next_narrow)) +
   geom_bar(position = "fill") +
   xlab("Infant Behavior") +
-  ylab("Proportion")
+  ylab("Proportion") +
+  ggtitle("Immediate responses to infant behavior") +
+  labs(fill = "Mother's Response")
 
 # By group, with uninvolved as a category
 infant_immediate_next %>% 
   mutate(immediate_next_narrow = fct_recode(immediate_next_narrow, "No response" = "Uninvolved")) %>% 
   ggplot(aes(x = Narrow_group, fill = immediate_next_narrow)) +
   geom_bar(position = "fill")
-
+  xlab("Infant Behavior") +
+  ylab("Proportion") +
+  ggtitle("Immediate responses to infant behavior") +
+  labs(fill = "Mother's Response")
 ```
 
 In case this is interesting, broken out by individual infant behavior:
@@ -480,7 +485,11 @@ In case this is interesting, broken out by individual infant behavior:
 infant_immediate_next %>% 
   ggplot(aes(x = Behavior, fill = immediate_next_narrow)) +
   geom_bar(position = "fill") + 
-  coord_flip()
+  coord_flip() +
+  xlab("Infant Behavior") +
+  ylab("Proportion") +
+  ggtitle("Immediate responses to infant behavior") +
+  labs(fill = "Mother's Response")
 ```
 
 
