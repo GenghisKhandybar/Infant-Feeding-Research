@@ -454,7 +454,7 @@ response_level_order = c("No response", "Uninvolved", "Other mother behavior", "
 
 infant_immediate_next = data_duration %>% 
   mutate(immediate_next_narrow = if_else(dyad_unit != lead(dyad_unit, 1), lead(Narrow_group), "No response")) %>% 
-  select(dyad_unit, Behavior, Narrow_group, immediate_next_narrow) %>% 
+  select(dyad_unit, Behavior, Narrow_group, immediate_next_narrow, dyad_set) %>% 
   filter(dyad_unit == "Baby", Narrow_group %in% c("Potent", "Subtle")) %>% 
   mutate(immediate_next_narrow = factor(immediate_next_narrow, levels = response_level_order))
 
@@ -465,18 +465,22 @@ infant_immediate_next %>%
   xlab("Infant Behavior") +
   ylab("Proportion") +
   ggtitle("Immediate responses to infant behavior") +
-  labs(fill = "Mother's Response")
+  labs(fill = "Mother's Response") +
+  facet_grid(rows = ~dyad_set)
 
 # By group, with uninvolved as a category
 infant_immediate_next %>% 
   mutate(immediate_next_narrow = fct_recode(immediate_next_narrow, "No response" = "Uninvolved")) %>% 
   ggplot(aes(x = Narrow_group, fill = immediate_next_narrow)) +
-  geom_bar(position = "fill")
+  geom_bar(position = "fill") +
   xlab("Infant Behavior") +
   ylab("Proportion") +
   ggtitle("Immediate responses to infant behavior") +
-  labs(fill = "Mother's Response")
+  labs(fill = "Mother's Response") +
+  facet_grid(rows = ~dyad_set)
 ```
+
+These two plots show the proportion of infants' behaviors immediately followed by a response. If the infant gives off two cues before the mother responds, the first one will be be categorized as "No response", while the second will have the mother's response category.
 
 In case this is interesting, broken out by individual infant behavior:
 
@@ -499,3 +503,40 @@ Plot 2
 - Histograms to compare distribution of responses times for potent vs subtle cues at each age
 
 - There will no "no responses" for this one. Do two versions: one where uninvolved is counted as a response and one where it's not.
+
+```{r}
+# Process copied from data-reshaping.Rmd, but without uninvolved mothers' behaviors
+times_until_next = data_duration %>% 
+  filter(Narrow_group != "Uninvolved") %>% 
+  group_by(id, dyad_set) %>% #create next_behavior and next_time
+  mutate(next_dyad_unit = lead(dyad_unit),
+         switch = if_else(next_dyad_unit == dyad_unit, 0, 1),
+         chain_group = cumsum(switch) - switch) %>% #Switch = 1 at end of group, chain group changes at start of new group
+  ungroup() %>% 
+  mutate(next_behavior = if_else(switch == 1, lead(Behavior), NULL),
+         next_group_narrow = if_else(switch == 1, lead(Narrow_group), NULL),
+         next_group_wide = if_else(switch == 1, lead(Wide_group), NULL),
+         next_time = if_else(switch == 1, lead(Time_Relative_sf), NULL)) %>% 
+  group_by(id, dyad_set, chain_group) %>% 
+  mutate(next_behavior = if_else(is.na(next_behavior), last(next_behavior), next_behavior),
+         next_group_narrow = if_else(is.na(next_group_narrow), last(next_group_narrow), next_group_narrow),
+         next_group_wide = if_else(is.na(next_group_wide), last(next_group_wide), next_group_wide),
+         next_time = if_else(is.na(next_time), last(next_time), next_time),
+         time_until_next = next_time - Time_Relative_sf) %>% 
+  mutate(one = 1,
+         remaining_cues = cumsum(one),
+         remaining_cues = max(remaining_cues) - remaining_cues) %>% 
+  ungroup() %>% 
+  select(-switch, -chain_group, -one) %>% 
+  filter(dyad_unit == "Baby") %>% 
+  select(dyad_set, Behavior, Narrow_group, time_until_next)
+  
+times_until_next %>% 
+  filter(Narrow_group %in% c("Potent", "Subtle")) %>% 
+  ggplot(aes(x = time_until_next, y = ..density..)) +
+  geom_histogram() +
+  facet_grid(facets = vars(Narrow_group)) +
+  xlab("Time until next mother response (excluding uninvolved behaviors)") +
+  ggtitle("Time until response by infant behavior")
+```
+
