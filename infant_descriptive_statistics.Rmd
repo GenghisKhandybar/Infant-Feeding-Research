@@ -152,7 +152,7 @@ time_plot <- function(states){
     geom_path() + 
     geom_point() +
     ylab("Mean Fraction of Time in State") +
-    xlab("Dyad Set") +
+    xlab("Infant Age") +
     ylim(0, 1) + 
     ggtitle("Proportion of time exhibiting certain behaviors") %>% 
     return()
