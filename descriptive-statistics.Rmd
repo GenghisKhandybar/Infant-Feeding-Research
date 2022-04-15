@@ -81,8 +81,6 @@ state_point_duration <- 0.00001 # for easier coding, treat state points as start
 
 data <- read_csv("all_data.csv") %>%
   mutate(Grouped_behavior = fct_recode(Behavior, !!!behaviors)) %>%
-  rename("id" = "ID_Number",
-         "coder_id" = "Coder") %>%
   mutate(
     Time_Relative_sf = as.double(Time_Relative_sf),
     Duration_sf = as.double(Duration_sf),
