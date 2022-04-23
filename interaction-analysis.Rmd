@@ -480,7 +480,7 @@ infant_immediate_next %>%
   facet_grid(rows = ~dyad_set)
 ```
 
-These two plots show the proportion of infants' behaviors immediately followed by a response. If the infant gives off two cues before the mother responds, the first one will be be categorized as "No response", while the second will have the mother's response category.
+These two plots show the proportion of infants' behaviors immediately followed by a response. If the infant gives off two cues before the mother responds, the first one will be be categorized as "No response", while the second will have the mother's response category. Currently "Bottle in mouth" and "Bottle offered" are categorized as "Other mother behavior".
 
 In case this is interesting, broken out by individual infant behavior:
 

@@ -118,18 +118,6 @@ behaviors <- left_join(behaviors,
                        behavior_codebook %>%
                          select(-Event_Type, -Event_Type)
 )
-
-# data <- data %>%
-#   mutate(Behavior = replace(Behavior,
-#                             Behavior == "Blocks mouth",
-#                             "Blocks mouth with hands or feet")) %>%
-#   left_join(behavior_codebook%>%
-#                          select(-Event_Type, -dyad_unit)
-#             , by=c("Behavior"))
-# 
-# write.csv(data,
-#   "data.csv",
-#   row.names=FALSE)
 ```
 
 Add columns for end time of each behavior, video length, and start/end/duration as fraction of video length.
