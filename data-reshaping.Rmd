@@ -48,8 +48,8 @@ n_time_points = length(dyad_set_levels)
 
 
 ```{r, include = FALSE}
-
-behavior_codebook <- read_csv("behavior_codebook.csv")  %>% #New behavior codebook has narrow and wide groupings.
+#New behavior codebook has narrow and wide groupings.
+behavior_codebook <- read_csv("behavior_codebook.csv")  %>% 
   rename(Grouped_behavior = Behavior_group)
 
 behaviors <- as.character(behavior_codebook$Behavior)
@@ -83,7 +83,9 @@ Excel files have already been cleaned and combined into one file.
 6moB Bottle rejector not available yet; make all non-rejectors for now.
 
 ```{r, read-data, include = FALSE}
-data <- read_csv("all_data.csv") %>% #Groups are added by left_join in code chunk below.
+# data is the simplest form, reading in the raw complete data.
+
+all_data <- read_csv("all_data.csv") %>% #Groups are added by left_join in code chunk below.
   # # mutate(Grouped_behavior = fct_recode(Behavior, !!!behaviors),
   # #        Wide_grouped_behavior = fct_recode(Behavior, !!!behaviors_wide),
   # #        Narrow_grouped_behavior = fct_recode(Behavior, !!!behaviors_narrow)
@@ -108,8 +110,10 @@ data <- read_csv("all_data.csv") %>% #Groups are added by left_join in code chun
 ```
 
 
-```{r data_update}
-behaviors <- data %>%
+```{r behaviors}
+# Creates behaviors, a dataframe of each unique behavior, its groups, and which dyad unit performs it.
+
+behaviors <- all_data %>%
   select(Behavior) %>%
   unique() %>%
   mutate(Behavior = replace(Behavior, Behavior == "Blocks mouth", "Blocks mouth with hands or feet"))
@@ -123,12 +127,17 @@ behaviors <- left_join(behaviors,
 Add columns for end time of each behavior, video length, and start/end/duration as fraction of video length.
 
 
-```{r duration-data}
-# individual instances of each behavior
-# For each behavior, compute start time, end time, and duration
-# as fraction of feeding length
+# data-duration
 
-data_duration <- data %>%
+data_duration is the most complete reshaped data for most purposes. It contains the starting time and duration of each behavior, as well as information about what behavior will come next from the other party.
+
+next_behavior = the other party's next behavior (even if it's after multiple of the original party's actions.)
+
+```{r duration-data}
+# 
+# 
+
+data_duration <- all_data %>%
   mutate(end_time = time + duration) %>%
   group_by(dyad_set, id) %>%
   mutate(duration_fraction = duration / max(end_time),
@@ -139,7 +148,7 @@ data_duration <- data %>%
 
 # now including interaction variables
 
-bottle_states <- data %>%
+bottle_states <- all_data %>%
   filter(str_detect(Behavior, "^Bottle")) %>%
   pull(Behavior) %>%
   unique()
@@ -186,7 +195,7 @@ Total number of dyads at each age
 
 ```{r}
 
-n_dyads <- data %>%
+n_dyads <- all_data %>%
   group_by(dyad_set, Bottle_Rejector) %>%
   summarize(n = n_distinct(id))
 
@@ -197,11 +206,11 @@ n_dyads# %>% kable()
 ```
 
 
-List of dyads observed
+List of dyads observed, with their ages and bottle rejector status. Used to create other datasets.
 
 ```{r}
 
-data_ids <- data %>%
+data_ids <- all_data %>%
   group_by(dyad_set, id) %>%
   summarize(id = first(id),
             Bottle_Rejector = first(Bottle_Rejector))
@@ -209,7 +218,7 @@ data_ids <- data %>%
 ```
 
 
-Summarize which dyads are observed at which ages
+data_map summarizes which dyads are observed at which ages
 
 - 0.0 = not observed
 - 0.5 = observed, Bottle rejector
@@ -227,7 +236,7 @@ count_positives <- function(x){
   length(x[x > 0])
 }
 
-data_map <- data %>%
+data_map <- all_data %>%
   group_by(id, dyad_set) %>%
   filter(row_number() == 1) %>% 
   mutate(indicator = 1 - 0.5 * as.numeric(as.character(Bottle_Rejector))) %>%
@@ -328,7 +337,7 @@ write.csv(data_dyad_total_zeros,
 # reshape-data-time-event
 
 ```{r reshape-data-time-event}
-behaviors <- data %>%
+behaviors <- all_data %>%
   select(Behavior) %>%
   unique()
 
@@ -350,25 +359,25 @@ create_state_path <- function(x) {
   
 }
 
-data <- data %>%
+all_data <- all_data %>%
   arrange(dyad_set, id, time, desc(Event_Type))
 
 for (l in bottle_states) {
   
-  x = ifelse(data$Behavior == l, data$Event_Type, NA)
+  x = ifelse(all_data$Behavior == l, all_data$Event_Type, NA)
   y = create_state_path(x)
-  data <- data %>%
+  all_data <- all_data %>%
     add_column(!!l := y)
   
 }
 
-bottle_state_code = max.col(data %>%
+bottle_state_code = max.col(all_data %>%
                               select(starts_with("Bottle "))) *
-  (data %>% mutate(bottle_sum = rowSums(across(starts_with("Bottle ")))) %>% pull(bottle_sum) > 0)
+  (all_data %>% mutate(bottle_sum = rowSums(across(starts_with("Bottle ")))) %>% pull(bottle_sum) > 0)
 bottle_state_code[bottle_state_code == 0] <- NA
 
-data <- data %>%
-  mutate(Bottle_state = names(data %>% select(starts_with("Bottle ")))[bottle_state_code]) %>%
+all_data <- all_data %>%
+  mutate(Bottle_state = names(all_data %>% select(starts_with("Bottle ")))[bottle_state_code]) %>%
   select(-starts_with("Bottle "))
 
 # Function translates start/stop column to 0/1 at each time point
@@ -387,7 +396,7 @@ create_state_path <- function(x){
 
 convert_to_point <- c("Crying", "Eyes Closed")
 
-data_time_event <- data %>%
+data_time_event <- all_data %>%
   filter(!(Behavior %in% convert_to_point & #Remove "State stop" lines for crying and eyes closed
              Event_Type == "State stop")) %>%
   mutate(Event_Type =
@@ -511,7 +520,7 @@ get_time_split <- function(x, q) {
 
 n_time_splits <- 4 # 4 for quarters; 3 for thirds; etc
 
-data_duration_time_split <- data %>%
+data_duration_time_split <- all_data %>%
   mutate(end_time = time + duration) %>%
   group_by(dyad_set, id) %>%
   mutate(duration_fraction = duration / max(end_time),
@@ -599,7 +608,7 @@ One row for each possible behavior for each dyad at each age.
 
 
 ```{r}
-behaviors <- data %>%
+behaviors <- all_data %>%
   select(Behavior) %>%
   unique() %>% 
   mutate(Behavior = replace(Behavior, Behavior == "Blocks mouth", "Blocks mouth with hands or feet")) %>% 
