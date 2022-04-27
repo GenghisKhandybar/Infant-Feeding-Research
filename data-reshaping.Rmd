@@ -5,7 +5,9 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
+# Data Reshaping
 
+This file refines all_data and behavior_codebook into many readily usable formats. These original dataset comes from creating-all-data in the data processing section.
 
 
 ```{r, include = FALSE}
@@ -132,9 +134,9 @@ Add columns for end time of each behavior, video length, and start/end/duration 
 data_duration is the most complete reshaped data for most purposes. It contains the starting time and duration of each behavior, as well as information about what behavior will come next from the other party.
 
 next_behavior = the other party's next behavior (even if it's after multiple of the original party's actions.)
+bottle_state = current bottle state at time of behavior.
 
 ```{r duration-data}
-# 
 # 
 
 data_duration <- all_data %>%
@@ -153,6 +155,11 @@ bottle_states <- all_data %>%
   pull(Behavior) %>%
   unique()
 
+
+# The following code adds bottle_state, next_behavior (and next_behavior_group variables), and next_time.
+# For this purpose, next_behavior is the next thing the other person does, even if there are more of the same person's behaviors beforehand.
+# This definition may change, and we are considering moving the next_behavior analysis code to interaction-analysis where we can choose what definition of next behavior to use on a plot by plot basis.
+
 data_duration <- data_duration %>% 
   group_by(dyad_set, id) %>% #Create bottle_state variable
   mutate(new_bottle_state = if_else(Behavior %in% bottle_states, 1, 0),
@@ -162,7 +169,7 @@ data_duration <- data_duration %>%
   mutate(bottle_state = if_else(time > 0, first(Behavior), "Bottle not in mouth")) %>% #Code start time:bottle not in mouth
   ungroup() %>% 
   select(-bout_code, -new_bottle_state) %>%  
-  group_by(id, dyad_set) %>% #create next_behavior and next_time
+  group_by(id, dyad_set) %>% # The rest of the code is to create next_behavior and next_time
   mutate(next_dyad_unit = lead(dyad_unit),
          switch = if_else(next_dyad_unit == dyad_unit, 0, 1),
          chain_group = cumsum(switch) - switch) %>% #Switch = 1 at end of group, chain group changes at start of new group
@@ -186,8 +193,6 @@ data_duration <- data_duration %>%
 write.csv(data_duration,
   "data_duration.csv",
   row.names=FALSE)
-
-data_duration %>% filter(is.na(Narrow_group))
 ```
 
 Total number of dyads at each age
