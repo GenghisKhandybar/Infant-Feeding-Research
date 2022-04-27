@@ -21,12 +21,11 @@ source("shared_setup.R")
 ```{r bar-grid}
 # Many bar plots -----------
 
-grid_plot <- function(group, num_splits){
-  used_behaviors <- behavior_codebook %>% 
-    filter(Narrow_group == group) %>% 
-    pull(Behavior)
+
+grid_plot <- function(used_behaviors, num_splits, behavior_group = ""){
   
   
+  # Finds what proportion of dyads expressed each behavior at least once during each quarter
   n_dyads_cue <- data_duration %>% #Cue representation in dyads before the requested time period
     filter(Behavior %in% used_behaviors) %>% 
     mutate(split = get_time_split(start_fraction, num_splits)) %>% 
@@ -43,18 +42,43 @@ grid_plot <- function(group, num_splits){
     ggplot(aes(y=prop_dyads, x = split)) +
     geom_bar(position="dodge", stat="identity") +
     facet_grid(reorder(Behavior, desc(prop_dyads))~dyad_set) +
-    ggtitle(paste("Percent of infants expressing ", group, " behaviors in each 1/", num_splits, " of feeding", sep = ""))+
-    xlab("Split") +
+    ggtitle(paste("Percent of infants expressing ", behavior_group, "behaviors in each 1/", num_splits, " of feeding", sep = ""))+
+    xlab(str_c("1/", num_splits, " Split")) +
     ylab("Proportion expressing cue within period") +
     theme(strip.text.y.right = element_text(angle = 0)) +
     ylim(0, 0.6) %>% 
     return()
 }
 
-grid_plot("Potent", 4)
-grid_plot("Subtle", 4)
-grid_plot("Potent", 5)
-grid_plot("Subtle", 5)
+potent_behaviors <- behavior_codebook %>% 
+    filter(Narrow_group == "Potent") %>% 
+    pull(Behavior)
+subtle_behaviors <- behavior_codebook %>% 
+    filter(Narrow_group == "Subtle") %>% 
+    pull(Behavior)
+infant_behaviors = behavior_codebook %>% 
+    filter(dyad_unit == "Baby") %>% 
+    pull(Behavior)
+
+grid_plot(potent_behaviors, 4, "potent ")
+grid_plot(subtle_behaviors, 4, "subtle ")
+grid_plot(potent_behaviors, 5, "potent ")
+grid_plot(subtle_behaviors, 5, "subtle ")
+
+
+```
+
+Plot with only cues most skewed towards the end:
+
+```{r}
+best_predictors = c("Lip compression/does not open mouth", 
+                    "Drools, spits out milk, spits up", 
+                    "Pushes bottle away", "Leans away or arches back", 
+                    "Shakes head or turns head/body away", 
+                    "Gags, coughs, chokes",
+                    "Crying")
+
+grid_plot(best_predictors, 4)
 ```
 
 ### Swapped barplot grid
