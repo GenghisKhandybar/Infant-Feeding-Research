@@ -9,10 +9,12 @@ output:
     number_sections: false
 ---
 
-This analysis includes bottle rejectors and non-rejectors.
+### This analysis temporarily excludes bottle rejectors (for consistency)
 
 ```{r setup, include=FALSE}
-include_rejectors <- c(0, 1)
+#This analysis includes bottle rejectors and non-rejectors.
+
+include_rejectors <- c(0) #, 1
 source("shared_setup.R")
 ```
 
@@ -453,6 +455,7 @@ Plot 1
 response_level_order = c("No response", "Uninvolved", "Other mother behavior", "Controlling-Limiting","Controlling-Encouragment", "Responsive")
 
 infant_immediate_next = data_duration %>% 
+  filter(Time_Relative_sf > 0) %>% 
   mutate(immediate_next_narrow = if_else(dyad_unit != lead(dyad_unit, 1), lead(Narrow_group), "No response")) %>% 
   select(dyad_unit, Behavior, Narrow_group, immediate_next_narrow, dyad_set) %>% 
   filter(dyad_unit == "Baby", Narrow_group %in% c("Potent", "Subtle")) %>% 
@@ -487,6 +490,7 @@ In case this is interesting, broken out by individual infant behavior:
 ```{r}
 #By individual behavior
 infant_immediate_next %>% 
+  mutate(immediate_next_narrow = fct_recode(immediate_next_narrow, "No response" = "Uninvolved", "Inserts/Offers Bottle" = "Other mother behavior", "Controlling" = "Controlling-Limiting", "Controlling" = "Controlling-Encouragment")) %>% 
   ggplot(aes(x = Behavior, fill = immediate_next_narrow)) +
   geom_bar(position = "fill") + 
   coord_flip() +
@@ -494,6 +498,34 @@ infant_immediate_next %>%
   ylab("Proportion") +
   ggtitle("Immediate responses to infant behavior") +
   labs(fill = "Mother's Response")
+
+#By individual behavior
+immediate_next_individual <- infant_immediate_next %>% 
+  mutate(immediate_next_narrow = fct_recode(immediate_next_narrow, 
+                                            "No response" = "Uninvolved", 
+                                            "Inserts/Offers Bottle" = "Other mother behavior", 
+                                            "Controlling" = "Controlling-Limiting", "Controlling" = "Controlling-Encouragment")) %>% 
+  group_by(Behavior, immediate_next_narrow) %>% 
+  summarize(n = n()) %>% 
+  group_by(Behavior) %>% 
+  mutate(prop = n/sum(n)) %>% 
+  ungroup()
+
+behavior_order = immediate_next_individual %>%
+  filter(immediate_next_narrow == "Responsive") %>% 
+  arrange(prop) %>% 
+  pull(Behavior)
+
+immediate_next_individual <- immediate_next_individual %>% 
+  mutate(Behavior = factor(Behavior, levels = behavior_order))
+
+immediate_next_individual %>% 
+  ggplot(aes(x = prop, y = Behavior, fill = immediate_next_narrow)) +
+  geom_bar(stat = "identity") +
+  xlab("Proportion") +
+  ylab("Infant Behavior") +
+  ggtitle("Immediate responses to infant behavior") +
+  labs(fill = "Mother's Response type")
 ```
 
 
