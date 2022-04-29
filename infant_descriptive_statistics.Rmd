@@ -39,14 +39,15 @@ grid_plot <- function(used_behaviors, num_splits, behavior_group = ""){
   
 
   n_dyads_cue %>% 
-    ggplot(aes(y=prop_dyads, x = split)) +
-    geom_bar(position="dodge", stat="identity") +
+    ggplot(aes(y=prop_dyads, x = split, fill = dyad_set)) +
+    geom_bar(position="dodge", stat="identity", colour = "black") +
     facet_grid(reorder(Behavior, desc(prop_dyads))~dyad_set) +
-    ggtitle(paste("Percent of infants expressing ", behavior_group, "behaviors in each 1/", num_splits, " of feeding", sep = ""))+
+    ggtitle(paste("Proportion of infants expressing ", behavior_group, "behaviors in each 1/", num_splits, " of feeding", sep = ""))+
     xlab(str_c("1/", num_splits, " Split")) +
     ylab("Proportion expressing cue within period") +
     theme(strip.text.y.right = element_text(angle = 0)) +
-    ylim(0, 0.6) %>% 
+    ylim(0, 0.6) +
+    theme(legend.position = "none") %>% #If using colors, remove them from the legend.
     return()
 }
 
@@ -265,6 +266,7 @@ line_plot("Potent")
 line_plot("Subtle")
 ```
 
+
 ## Proportional analysis
 
 ```{r}
@@ -343,6 +345,51 @@ data_dyad_total_zeros %>%
   freq_boxplot("Subtle", "(log base 2 scale)")
 ```
 
+## Overall cues per minute, by age and quarter
+
+```{r}
+quarterly_activity <- data_duration %>% #Cue representation in dyads before the requested time period
+  filter(dyad_unit == "Baby", Time_Relative_sf > 0) %>% # Looking at only baby cues, ignoring the initial state setters.
+  mutate(split = get_time_split(start_fraction, 4)) %>% # select(Time_Relative_sf, video_length/4, split) %>% mutate(quarter_length = video_length/4)
+  group_by(dyad_set, id, split, video_length) %>%
+  summarize(behaviors_per_minute = n()/((video_length/60)/4)) %>% 
+  distinct(dyad_set, id, split, behaviors_per_minute) %>% 
+  #Because some infants did not perform cues in a given quarter, we must fill those in as 0 behaviors.
+  #To do this, we will pivot wider, filling unused spaces with 0, then pivot back to the original form.
+  pivot_wider(id_cols = c(dyad_set, id), names_from = split, values_from = behaviors_per_minute, values_fill = 0) %>% 
+  pivot_longer(names_to = "split", cols = c("1", "2", "3", "4"), values_to = "behaviors_per_minute")
+
+overall_activity_plot <- quarterly_activity %>% 
+  ggplot(aes(x = split, y = behaviors_per_minute, fill = dyad_set)) +
+  geom_boxplot() +
+  stat_summary(
+    fun.y = median,
+    geom = 'line',
+    aes(group = dyad_set),
+    position = position_dodge(width = 0.9) #this has to be added
+  ) +
+  facet_grid(cols = vars(dyad_set)) +
+  scale_y_continuous(minor_breaks = seq(0 , 100, 1), breaks = seq(0, 100, 2)) +
+  ylab("Cues per minute") +
+  xlab("Quarter of feeding") +
+  theme(legend.position = "none")
 
 
+
+overall_activity_plot 
+```
+
+(plot with title)
+
+```{r}
+overall_activity_plot + ggtitle("Infant activity levels by quarter of feeding")
+```
+
+```{r}
+data_duration %>% #Cue representation in dyads before the requested time period
+  filter(dyad_unit == "Baby", Time_Relative_sf > 0) %>% # Looking at only baby cues, ignoring the initial state setters.
+  mutate(split = get_time_split(start_fraction, 4)) %>% 
+  select(Time_Relative_sf, video_length/4, split, dyad_set) %>% 
+  mutate(quarter_length = video_length/4)
+```
 

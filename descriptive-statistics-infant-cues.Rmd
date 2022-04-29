@@ -22,24 +22,36 @@ source("shared_setup.R")
 
 
 ```{r}
+#To do: remove bottle_rejector, replace with Finished everywhere
+
 video_lengths <- data_dyad_total_zeros %>%
   group_by(dyad_set, id) %>%
   filter(video_length == max(video_length)) %>%
   filter(row_number() == 1) %>%
-  select(id, dyad_set, video_length, Bottle_Rejector)
+  mutate(finished = if_else(Bottle_Rejector == 0, "Yes", "No")) %>% # Instead of bottle rejector, using finished
+  mutate(finished = factor(finished, levels = c("Yes", "No"))) %>% 
+  select(id, dyad_set, video_length, Bottle_Rejector, finished)
 
 ggplot(video_lengths,
        aes(x = video_length, color = dyad_set, fill = dyad_set)) +
   geom_histogram(aes(y = ..density..), alpha=0.3, position = "identity")
   
 ggplot(video_lengths,
-       aes(x = dyad_set, y = video_length, col = dyad_set)) +
-  coord_flip() +
+       aes(x = dyad_set, y = video_length/60, col = dyad_set)) +
   geom_violin() + 
-  geom_boxplot(width = 0.1) + 
-  geom_jitter(aes(shape = Bottle_Rejector), alpha = 0.8) +
-  scale_shape_manual(values = c(1, 4))
-                 
+  geom_boxplot(color = "black", width = 0.2) +
+  stat_summary(
+    fun.y = median,
+    geom = 'line',
+    aes(group = dyad_set),
+    position = position_dodge(width = 0.9) #this has to be added
+  ) +
+  geom_jitter(aes(shape = finished), alpha = 0.85) +
+  scale_shape_manual(values = c(1, 4)) +
+  guides(shape = guide_legend("Infant Emptied Bottle"), color = FALSE) +
+  ylab("Feeding length (Minutes)") +
+  xlab("Infant Age") +
+  ggtitle("Feeding times by age")
 ```
 
 ```{r}
