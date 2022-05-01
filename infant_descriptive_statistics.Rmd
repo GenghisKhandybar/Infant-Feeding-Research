@@ -260,7 +260,7 @@ line_plot <- function(group){
     ylab("Average expressions per minute") +
     xlab("Baby age")
   
-  p %>% ggplotly()
+  p
 }
 line_plot("Potent")
 line_plot("Subtle")
@@ -289,7 +289,7 @@ line_plot <- function(group){
     ylab("Proportion expressing cue at least once") +
     xlab("Baby age")
   
-  p %>% ggplotly()
+  p
 }
 
 line_plot("Potent")
