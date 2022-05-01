@@ -721,3 +721,16 @@ write.csv(halved_data,
           row.names = FALSE)
 ```
 
+# data_onehot
+
+```{r}
+#data_onehot makes every behavior's start and ending into a numeric variable. This should help with our modeling efforts.
+data_onehot <- data %>% 
+  select(id, dyad_set, Time_Relative_sf, Behavior, Event_Type) %>%
+  mutate(temp_1 = 1) %>%  # To fill all true columns with 1, else 0.
+  pivot_wider(names_from =  c(Behavior,Event_Type), values_from = temp_1, values_fill = 0)
+
+data_onehot
+write.csv(data_onehot, "data_onehot.csv")
+```
+
