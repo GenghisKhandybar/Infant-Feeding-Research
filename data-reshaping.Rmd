@@ -723,12 +723,21 @@ write.csv(halved_data,
 
 # data_onehot
 
+EXCLUDING "State stop" lines currently. They made redundant columns, but may be useful later.
+
 ```{r}
 #data_onehot makes every behavior's start and ending into a numeric variable. This should help with our modeling efforts.
 data_onehot <- data %>% 
   select(id, dyad_set, Time_Relative_sf, Behavior, Event_Type) %>%
+  filter(Event_Type != "State stop") %>%
   mutate(temp_1 = 1) %>%  # To fill all true columns with 1, else 0.
-  pivot_wider(names_from =  c(Behavior,Event_Type), values_from = temp_1, values_fill = 0)
+  # New column name: Behavior name, or if state stop then "Stops " + Behavior name
+  mutate(
+    behavior_name = str_c(if_else(Event_Type == "State point" | Event_Type == "State start", "", "Stops "),
+                               Behavior)) %>% 
+  pivot_wider(names_from =  c(behavior_name), values_from = temp_1, values_fill = 0) %>% 
+  group_by(id, dyad_set, Time_Relative_sf) %>% 
+  summarise(across(where(is.numeric), ~ sum(.x, na.rm = TRUE)))
 
 data_onehot
 write.csv(data_onehot, "data_onehot.csv")
