@@ -19,7 +19,7 @@ source("shared_setup.R")
 ```
 
 ```{r}
-data_onehot <- read_csv("data_onehot.csv")
+df_behavior_clusters <- read_csv("df_behavior_clusters.csv")
 ```
 
 
@@ -612,77 +612,52 @@ times_until_next %>%
   ggtitle("Time until response by infant behavior")
 ```
 
-# END
+# Showcase for df_behavior_clusters
 
-(This is the end for now - improved clusters are in progress.)
-
-```{r}
-knitr::knit_exit()
-```
-
-# Improved clusters
-
-- When a cue occurs, compile many parts of what happens in the next 10 seconds into a single line.
-
-To edit the time window, change the value below (window_seconds)
+Clusters
 
 ```{r}
-window_seconds = 10
-
-#Finding names of the behavior columns
-onehot_behavior_columns = colnames(data_onehot)
-#match finds the index of the first behavior, which is always "Eyes open". This selects that and all remaining column names.
-onehot_behavior_columns = onehot_behavior_columns[match("Eyes Open", onehot_behavior_columns):length(onehot_behavior_columns)]
+df_behavior_clusters %>% 
+  filter(id == 70008, dyad_set == "4 months") %>% 
+  head(10)
 ```
+
+To validate, the data as normally seen: 
+
+Only state starts and state points - state stops were excluded from both, as they represent actions that are redundant or unclear in meaning such as no longer looking at phone (what category would this fall in?).
 
 ```{r}
-# Direct method (each behavior is only part of one group, each group lasting up to 10 seconds.)
-
-# Step 1: Add variable for how much time has passed since last cue
-df_clusters <- data_onehot %>% 
-  mutate(
-    time_elapsed = Time_Relative_sf - lag(Time_Relative_sf, default = 0), # Time from the previous behavior
-    )
-
-# Step 2: Group each time where cues occur into a cluster
-group_vec = as.numeric(nrow(df_clusters))
-for(row in 1:nrow(df_clusters)){ #Loop through each row in the dataframe
-  if (df_clusters[row, "Time_Relative_sf"] == 0){ # Reset the group counter at the start of each video. This makes group 0 onlyinclude time=0 cues
-    current_group = 0
-    current_remaining = -1
-  } else {
-    elapsed = df_clusters[row, "time_elapsed"]
-    current_remaining = current_remaining = current_remaining - elapsed # Subtract time elaped from time remaining in this group
-    if (current_remaining < 0){ # When the time remaining in the cluster falls below 0, we start a new cluster with 10 seconds remaining.
-      current_group = current_group + 1
-      current_remaining = window_seconds
-    }
-  }
-  group_vec[row] = current_group # On each row, record what group it falls into
-}
-df_clusters["cluster_group"] <- group_vec # Add our clusters column to the dataframe
-
-df_temp <- df_clusters
-
-#Step 3: Group behaviors by cluster. add up all behaviors within clusters
-df_cluster_sums <- df_clusters %>% 
-  group_by(id, dyad_set, cluster_group) %>% 
-  summarize_at(onehot_behavior_columns, sum)
-
-# Step 4: Create time variables
-df_cluster_times <- df_clusters %>% 
-  group_by(id, dyad_set, cluster_group) %>% 
-  summarize(start_time = min(Time_Relative_sf),
-            end_time = max(Time_Relative_sf),
-            cluster_time = end_time - start_time)
-  
-#Step 5: Create grouped behavior columns
-# To make these, we will pivot the table into a wider form where each behavior is a row, find additional information, then re-group.
-df_cluster_group_cols <- df_clusters %>% 
-  pivot_longer(cols = all_of(onehot_behavior_columns), names_to = "Behavior", values_to = "count") %>% 
-  left_join(behavior_codebook, by="Behavior") %>%
-  group_by(id, dyad_set, cluster_group, Narrow_group, dyad_unit) %>% 
-  summarize(count = sum(count)) %>% 
-  pivot_wider(id_cols = c(id, dyad_set, cluster_group), names_from = Narrow_group, values_from = count)
+data_duration %>% 
+  filter(id == 70008, dyad_set == "4 months") %>% 
+  select(-Event_Log, -Observation, -Comment, -Bottle_Emptying) %>% 
+  head(10)
 ```
+
+
+## Sample plots
+
+Sample plot 1: Infant cues vs. mother cues in bout
+
+```{r}
+df_behavior_clusters %>% 
+  ggplot(aes(x = Baby, y = Mom)) +
+  geom_jitter(alpha = 0.1)
+```
+
+
+Sample plot 2: Infants' cues during a cluster vs. mother's behaviors. (Grouped, Jittered) Each point is one cluster.
+
+```{r}
+df_behavior_clusters %>% 
+  pivot_longer(c("Potent", "Subtle"), names_to = "Infant_behavior_type", values_to = "Infant_behavior_count") %>% 
+  pivot_longer(c("Controlling-Encouragment", "Controlling-Limiting", "Other mother behavior", "Responsive"), names_to = "Mother_behavior_type", values_to = "Mother_behavior_count") %>% 
+  #mutate(Infant_behavior_count = as.factor(Infant_behavior_count),
+  #       Mother_behavior_count = as.factor(Mother_behavior_count)) %>% 
+  ggplot(aes(x = Infant_behavior_count, y = Mother_behavior_count)) +
+  #geom_tile(alpha = 0.01) +
+  geom_jitter(alpha = 0.1) +
+  facet_grid(rows = vars(Infant_behavior_type), cols = vars(Mother_behavior_type))
+```
+
+
 
