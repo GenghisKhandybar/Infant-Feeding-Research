@@ -22,7 +22,7 @@ source("shared_setup.R")
 # Many bar plots -----------
 
 
-grid_plot <- function(used_behaviors, num_splits, behavior_group = ""){
+grid_plot <- function(used_behaviors, num_splits, behavior_group = "", splits_name = "Quarter"){
   
   
   # Finds what proportion of dyads expressed each behavior at least once during each quarter
@@ -42,8 +42,8 @@ grid_plot <- function(used_behaviors, num_splits, behavior_group = ""){
     ggplot(aes(y=prop_dyads, x = split, fill = dyad_set)) +
     geom_bar(position="dodge", stat="identity", colour = "black") +
     facet_grid(reorder(Behavior, desc(prop_dyads))~dyad_set) +
-    ggtitle(paste("Proportion of infants expressing ", behavior_group, "behaviors in each 1/", num_splits, " of feeding", sep = ""))+
-    xlab(str_c("1/", num_splits, " Split")) +
+    ggtitle(paste("Proportion of infants expressing ", behavior_group, "behaviors in each ", tolower(splits_name), " of feeding", sep = ""))+
+    xlab(str_c(splits_name, " of feeding")) +
     ylab("Proportion expressing cue within period") +
     theme(strip.text.y.right = element_text(angle = 0)) +
     ylim(0, 0.6) +
@@ -63,8 +63,8 @@ infant_behaviors = behavior_codebook %>%
 
 grid_plot(potent_behaviors, 4, "potent ")
 grid_plot(subtle_behaviors, 4, "subtle ")
-grid_plot(potent_behaviors, 5, "potent ")
-grid_plot(subtle_behaviors, 5, "subtle ")
+grid_plot(potent_behaviors, 5, "potent ", splits_name = "1/5")
+grid_plot(subtle_behaviors, 5, "subtle ", splits_name = "1/5")
 
 
 ```
@@ -385,11 +385,32 @@ overall_activity_plot
 overall_activity_plot + ggtitle("Infant activity levels by quarter of feeding")
 ```
 
-```{r}
+```{r, eval = FALSE}
 data_duration %>% #Cue representation in dyads before the requested time period
   filter(dyad_unit == "Baby", Time_Relative_sf > 0) %>% # Looking at only baby cues, ignoring the initial state setters.
   mutate(split = get_time_split(start_fraction, 4)) %>% 
   select(Time_Relative_sf, video_length/4, split, dyad_set) %>% 
-  mutate(quarter_length = video_length/4)
+  mutate(quarter_length = video_length/4) %>% head(10)
+```
+
+# Within-infant feeding length variability
+
+```{r}
+data_duration %>% 
+  distinct(id, dyad_set, .keep_all = TRUE) %>% 
+  ggplot(aes(x = dyad_set, y = video_length)) +
+  geom_point(aes(), alpha = 0.5) +
+  geom_line(aes(group = id),  alpha = 0.1)
+```
+
+```{r}
+data_duration %>% 
+  distinct(id, dyad_set, .keep_all = TRUE) %>% 
+  mutate(video_minutes = video_length/60) %>% 
+  pivot_wider(id_cols = id, names_from = dyad_set, values_from = video_minutes) %>% 
+  select(-id) %>% 
+  ggpairs(fill = c("blue", "green", "red", "orange")) +
+  scale_fill_hue(list(continuous = wrap("densityDiag"), fill = "blue"))+
+  ggtitle("Same-infant variability between feeding times (in minutes)")
 ```
 
