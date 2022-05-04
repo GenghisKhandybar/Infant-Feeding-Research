@@ -18,6 +18,10 @@ include_rejectors <- c(0) #, 1
 source("shared_setup.R")
 ```
 
+```{r}
+data_onehot <- read_csv("data_onehot.csv")
+```
+
 
 ## 1. Plot number of cues versus number of mom behaviors (per length of feeding) for dyads across ages, in total and for some of the specific cue-behavior comparisons in Dr. Ventura’s notes.
 
@@ -489,17 +493,6 @@ In case this is interesting, broken out by individual infant behavior:
 
 ```{r}
 #By individual behavior
-infant_immediate_next %>% 
-  mutate(immediate_next_narrow = fct_recode(immediate_next_narrow, "No response" = "Uninvolved", "Inserts/Offers Bottle" = "Other mother behavior", "Controlling" = "Controlling-Limiting", "Controlling" = "Controlling-Encouragment")) %>% 
-  ggplot(aes(x = Behavior, fill = immediate_next_narrow)) +
-  geom_bar(position = "fill") + 
-  coord_flip() +
-  xlab("Infant Behavior") +
-  ylab("Proportion") +
-  ggtitle("Immediate responses to infant behavior") +
-  labs(fill = "Mother's Response")
-
-#By individual behavior
 immediate_next_individual <- infant_immediate_next %>% 
   mutate(immediate_next_narrow = fct_recode(immediate_next_narrow, 
                                             "No response" = "Uninvolved", 
@@ -528,6 +521,53 @@ immediate_next_individual %>%
   labs(fill = "Mother's Response type")
 ```
 
+# Responses within 10 seconds
+
+Using the mother's next action: If that action is not within 10 seconds, it is listed as "No response". 
+
+```{r}
+window_seconds = 10
+
+next_response_within_window <- data_duration %>% 
+  filter(dyad_unit == "Baby", Time_Relative_sf > 0) %>% 
+  # Change behaviors more than 10 seconds to "No response"
+  mutate(mother_response = if_else(time_until_next <= window_seconds & !is.na(next_group_narrow), next_group_narrow, "No response")) %>% 
+  # Further grouping and changing 
+  mutate(mother_response = fct_recode(mother_response, 
+                                      "No response" = "Uninvolved", 
+                                      "Inserts/Offers Bottle" = "Other mother behavior", 
+                                      "Controlling" = "Controlling-Limiting", "Controlling" = "Controlling-Encouragment")) %>% 
+  mutate(mother_response = factor(mother_response, levels = c("No response", "Inserts/Offers Bottle", "Controlling", "Responsive"))) %>% 
+  group_by(Behavior, mother_response) %>% 
+  summarize(n = n()) %>% 
+  group_by(Behavior) %>% 
+  mutate(prop = n/sum(n)) %>% 
+  ungroup()
+
+# Next, we order the behaviors by what proportion receive a responsive response
+behavior_order = next_response_within_window %>%
+  filter(mother_response == "Responsive") %>% 
+  arrange(prop) %>% 
+  pull(Behavior)
+
+next_response_within_window <- next_response_within_window %>% 
+  mutate(Behavior = factor(Behavior, levels = behavior_order))
+
+# Then plot by individual behavior
+next_response_within_window %>% 
+  ggplot(aes(x = prop, y = Behavior, fill = mother_response)) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous(minor_breaks = seq(0.1 , 0.9, 0.2), breaks = seq(0, 1, 0.2)) + 
+  theme(panel.grid.major.x = element_line("grey40", 0.25),
+        panel.grid.minor.x = element_line("grey80", 0.25),
+        panel.grid.major.y = element_blank()) +
+  xlab("Proportion") +
+  ylab("Infant cue") +
+  ggtitle("Responses within 10 seconds of infant cues") +
+  labs(fill = "Mother's Response type")
+```
+
+# Times until response
 
 Plot 2
 - For each infant cue measure amount of time until next mom response (whenever it happens, even if multiple infant cues in between), excluding changes in bottle state. For example, if Cries at 10, Shakes head at 12, and Burbs at 17, then time for Cries is 7 and for Shakes head is 5.
@@ -570,5 +610,79 @@ times_until_next %>%
   facet_grid(facets = vars(Narrow_group)) +
   xlab("Time until next mother response (excluding uninvolved behaviors)") +
   ggtitle("Time until response by infant behavior")
+```
+
+# END
+
+(This is the end for now - improved clusters are in progress.)
+
+```{r}
+knitr::knit_exit()
+```
+
+# Improved clusters
+
+- When a cue occurs, compile many parts of what happens in the next 10 seconds into a single line.
+
+To edit the time window, change the value below (window_seconds)
+
+```{r}
+window_seconds = 10
+
+#Finding names of the behavior columns
+onehot_behavior_columns = colnames(data_onehot)
+#match finds the index of the first behavior, which is always "Eyes open". This selects that and all remaining column names.
+onehot_behavior_columns = onehot_behavior_columns[match("Eyes Open", onehot_behavior_columns):length(onehot_behavior_columns)]
+```
+
+```{r}
+# Direct method (each behavior is only part of one group, each group lasting up to 10 seconds.)
+
+# Step 1: Add variable for how much time has passed since last cue
+df_clusters <- data_onehot %>% 
+  mutate(
+    time_elapsed = Time_Relative_sf - lag(Time_Relative_sf, default = 0), # Time from the previous behavior
+    )
+
+# Step 2: Group each time where cues occur into a cluster
+group_vec = as.numeric(nrow(df_clusters))
+for(row in 1:nrow(df_clusters)){ #Loop through each row in the dataframe
+  if (df_clusters[row, "Time_Relative_sf"] == 0){ # Reset the group counter at the start of each video. This makes group 0 onlyinclude time=0 cues
+    current_group = 0
+    current_remaining = -1
+  } else {
+    elapsed = df_clusters[row, "time_elapsed"]
+    current_remaining = current_remaining = current_remaining - elapsed # Subtract time elaped from time remaining in this group
+    if (current_remaining < 0){ # When the time remaining in the cluster falls below 0, we start a new cluster with 10 seconds remaining.
+      current_group = current_group + 1
+      current_remaining = window_seconds
+    }
+  }
+  group_vec[row] = current_group # On each row, record what group it falls into
+}
+df_clusters["cluster_group"] <- group_vec # Add our clusters column to the dataframe
+
+df_temp <- df_clusters
+
+#Step 3: Group behaviors by cluster. add up all behaviors within clusters
+df_cluster_sums <- df_clusters %>% 
+  group_by(id, dyad_set, cluster_group) %>% 
+  summarize_at(onehot_behavior_columns, sum)
+
+# Step 4: Create time variables
+df_cluster_times <- df_clusters %>% 
+  group_by(id, dyad_set, cluster_group) %>% 
+  summarize(start_time = min(Time_Relative_sf),
+            end_time = max(Time_Relative_sf),
+            cluster_time = end_time - start_time)
+  
+#Step 5: Create grouped behavior columns
+# To make these, we will pivot the table into a wider form where each behavior is a row, find additional information, then re-group.
+df_cluster_group_cols <- df_clusters %>% 
+  pivot_longer(cols = all_of(onehot_behavior_columns), names_to = "Behavior", values_to = "count") %>% 
+  left_join(behavior_codebook, by="Behavior") %>%
+  group_by(id, dyad_set, cluster_group, Narrow_group, dyad_unit) %>% 
+  summarize(count = sum(count)) %>% 
+  pivot_wider(id_cols = c(id, dyad_set, cluster_group), names_from = Narrow_group, values_from = count)
 ```
 
