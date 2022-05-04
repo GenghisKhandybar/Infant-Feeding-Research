@@ -820,10 +820,22 @@ df_cluster_group_cols <- df_clusters %>%
   pivot_wider(id_cols = c(id, dyad_set, cluster_group), names_from = Narrow_group, values_from = count)
 
 # Could copy step 5 to sum behaviors by wide group or infant/mother
+# Step 5.5
+df_cluster_dyad_cols <- df_clusters %>% 
+  pivot_longer(cols = all_of(onehot_behavior_columns), names_to = "Behavior", values_to = "count") %>% 
+  left_join(behavior_codebook, by="Behavior") %>%
+  group_by(id, dyad_set, cluster_group, dyad_unit) %>% 
+  summarize(count = sum(count)) %>% 
+  pivot_wider(id_cols = c(id, dyad_set, cluster_group), names_from = dyad_unit, values_from = count)
 
 # Step 6: Join these 2 together.
 df_behavior_clusters <- df_cluster_times %>% 
-  left_join(df_cluster_group_cols, by = c("id", "dyad_set", "cluster_group"))
+  left_join(df_cluster_group_cols, by = c("id", "dyad_set", "cluster_group")) %>% 
+  left_join(df_cluster_dyad_cols, by = c("id", "dyad_set", "cluster_group"))
 
-write.csv(df_behavior_clusters, "df_behavior_clustsers.csv")
+# Step 7: Remove standard cluster 0 (which just starts states off)
+df_behavior_clusters <- df_behavior_clusters %>% 
+  filter(cluster_group > 0)
+
+write.csv(df_behavior_clusters, "df_behavior_clusters.csv")
 ```
