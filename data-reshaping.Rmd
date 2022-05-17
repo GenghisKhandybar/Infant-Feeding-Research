@@ -466,7 +466,6 @@ data_time_event <- data_time_event %>%
 
 # Add counter for each bottle state in a feeding
 
-
 data_time_event <- data_time_event %>%
   rename_with(~ gsub(" ", "_", .x), starts_with("Bottle ")) %>%
   mutate(Bottle_state_code =
@@ -722,31 +721,72 @@ write.csv(halved_data,
 
 # data_onehot
 
-EXCLUDING "State stop" lines currently. They made redundant columns, but may be useful later.
+EXCLUDING "State stop" lines currently, but including when states are active. They made redundant columns, but may be useful later.
 
 ```{r}
 #data_onehot makes every behavior's start and ending into a numeric variable. This should help with our modeling efforts.
 
 #Currently using data_duration, which already has a bottle_state column and no state_stop lines.
+positive_state_behaviors <- c("Crying", "Eyes Closed", "Looks at phone or device", "Bottle in mouth", "Bottle Offered")
 
-# Step 1: Pivot wider to have one column per behavior label
-data_onehot <- data_duration %>% 
+#Step 1: Add a column for each positive state
+all_data_states <- all_data
+
+for(state_name in positive_state_behaviors){
+  #state_name = "Crying"
+  
+  all_data_states <- all_data_states %>% 
+    group_by(dyad_set, id) %>% #Creating temporary variables to make state variables
+    mutate(new_state = if_else(Behavior == state_name, 1, 0),
+           on_or_off = if_else(Behavior == state_name, if_else(Event_Type == "State start", 1, 0), 0), #1 = start, 0 = end, 0 = neither
+           # All states (listed above) are considered not happening if they have not been mentioned in the feeding yet.
+           bout_code = cumsum(new_state)) %>% 
+    ungroup() %>% 
+    group_by(dyad_set, id, bout_code) %>% 
+    mutate(state = if_else(time > 0, first(on_or_off), 0)) %>% #Code start time:bottle not in mouth
+    ungroup() %>% 
+    select(-new_state, -on_or_off, -bout_code)#remove temporary variables
+    # Rename new state column
+    names(all_data_states)[names(all_data_states) == "state"] <- str_c("state_", state_name)
+}
+
+# Step 2: Remove state_stop lines and add bottle_state variable.
+#Now that we have our states, we can remove the state_stop lines, as they aren't considered to be an action.
+all_data_states <- all_data_states %>% 
+  filter(Event_Type != "State stop") %>% 
+  group_by(dyad_set, id) %>% #Create bottle_state variable
+  mutate(new_bottle_state = if_else(Behavior %in% bottle_states, 1, 0),
+         bout_code = cumsum(new_bottle_state)) %>% 
+  ungroup() %>% 
+  group_by(dyad_set, id, bout_code) %>% 
+  mutate(bottle_state = if_else(time > 0, first(Behavior), "Bottle not in mouth")) %>% #Code start time:bottle not in mouth
+  ungroup() %>% 
+  select(-bout_code, -new_bottle_state)
+  
+  
+
+# Step 3: Pivot wider to have one column per behavior label
+data_onehot <- all_data_states %>% 
   mutate(previous_bottle_state = lag(bottle_state, default = "Bottle not in mouth")) %>% 
-  select(id, dyad_set, Time_Relative_sf, Behavior, Event_Type, bottle_state, previous_bottle_state) %>%
+  #select(id, dyad_set, Time_Relative_sf, Behavior, Event_Type, bottle_state, previous_bottle_state) %>%
   filter(Event_Type != "State stop") %>%
-  mutate(temp_1 = 1) %>%  # To fill all true columns with 1, else 0.
   # New columns receive the following name: Behavior name, or if state stop then "Stops " + Behavior name
-  mutate(
-    behavior_name = str_c(if_else(Event_Type == "State point" | Event_Type == "State start", "", "Stops "),
-                               Behavior)) %>% 
-  pivot_wider(names_from =  c(behavior_name), values_from = temp_1, values_fill = 0) 
-  
-# Step 2: Identify the behavior columns. They must be to the right of all other columns for this method to work, and start with "Eys Open".
-onehot_behavior_columns = colnames(data_onehot)
-#match finds the index of the first behavior, which is always "Eyes open". This selects that and all remaining column names.
-onehot_behavior_columns = onehot_behavior_columns[match("Eyes Open", onehot_behavior_columns):length(onehot_behavior_columns)]
-  
-# Step 3: Then we group all cues that happen at the same time into one line.
+  #mutate(
+  #  behavior_name = str_c(if_else(Event_Type == "State point", "", "Starts "),
+  #                             Behavior)) %>% 
+  #mutate(behavior_name = as.factor(behavior_name)) %>% 
+  mutate(temp_1 = 1.0) %>%  # To fill all true columns with 1, else 0.
+  pivot_wider(names_from = Behavior, values_from = temp_1, values_fill = 0)
+
+# Step 4: Identify the behavior columns and state columns for later use. 
+# They must be to the right of all other columns for this method to work, and start with "Starts Eyes Open".
+onehot_columns = colnames(data_onehot)
+# The behavior colunms are all the columns to the right of "Eyes Open" at this stage.
+onehot_behavior_columns = onehot_columns[match("Eyes Open", onehot_columns):length(onehot_columns)]
+# The state columns start with "state_Crying" and end with "Eyes Open"
+onehot_state_columns = onehot_columns[match("state_Crying", onehot_columns):(match("bottle_state", onehot_columns)-1)]
+
+# Step 5: Then we group all cues that happen at the same time into one line.
 data_onehot <- data_onehot %>% 
   group_by(id, dyad_set, Time_Relative_sf) %>% 
   summarise(starting_bottle_state = first(previous_bottle_state),
@@ -757,6 +797,8 @@ data_onehot <- data_onehot %>%
   mutate(changed_bottle_state = if_else(starting_bottle_state == ending_bottle_state, NA_character_, ending_bottle_state))
 
 head(data_onehot)
+
+write.csv(data_onehot, "data_onehot.csv")
 ```
 # Improved clusters
 
@@ -772,13 +814,15 @@ window_seconds = 10
 # Direct method (each behavior is only part of one group, each group lasting up to 10 seconds.)
 
 # Step 1: Add variable for how much time has passed since last cue
+
 df_clusters <- data_onehot %>% 
   mutate(
     time_elapsed = Time_Relative_sf - lag(Time_Relative_sf, default = 0), # Time from the previous behavior
     )
 
 # Step 2: Group each time where cues occur into a cluster
-group_vec = as.numeric(nrow(df_clusters))
+
+group_vec = numeric(nrow(df_clusters))
 for(row in 1:nrow(df_clusters)){ #Loop through each row in the dataframe
   if (df_clusters[row, "Time_Relative_sf"] == 0){ # Reset the group counter at the start of each video. This makes group 0 onlyinclude time=0 cues
     current_group = 0
@@ -796,6 +840,7 @@ for(row in 1:nrow(df_clusters)){ #Loop through each row in the dataframe
 df_clusters["cluster_group"] <- group_vec # Add our clusters column to the dataframe
 
 df_temp <- df_clusters
+#df_clusters <- df_temp
 
 # Steps 4-5 each each manipulate df_clusters in different ways to make columns that are later joined.
 
@@ -807,7 +852,8 @@ df_cluster_times <- df_clusters %>%
             cluster_time = end_time - start_time,
             bottle_state_start = first(starting_bottle_state),
             bottle_state_changed = first(na.omit(changed_bottle_state)), # this will be NA unless the bottle state changed
-            across(onehot_behavior_columns, sum) # For each of the behavior columns, its new value is the sum over the group.
+            across(onehot_behavior_columns, sum), # For each of the behavior columns, its new value is the sum over the group.
+            across(onehot_state_columns, max) # For each state column, if it was active at any point in the cluster, it is considered active
             )
   
 # Step 5: Create grouped behavior columns
