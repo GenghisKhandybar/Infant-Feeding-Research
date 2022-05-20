@@ -18,10 +18,6 @@ include_rejectors <- c(0) #, 1
 source("shared_setup.R")
 ```
 
-```{r}
-df_behavior_clusters <- read_csv("df_behavior_clusters.csv")
-```
-
 
 ## 1. Plot number of cues versus number of mom behaviors (per length of feeding) for dyads across ages, in total and for some of the specific cue-behavior comparisons in Dr. Ventura’s notes.
 
@@ -659,5 +655,18 @@ df_behavior_clusters %>%
   facet_grid(rows = vars(Infant_behavior_type), cols = vars(Mother_behavior_type))
 ```
 
+```{r}
+df_behavior_clusters %>% 
+  pivot_longer(cols = behaviors, names_to = "behavior", values_to = "happened_in_cluster") %>% 
+  filter(bottle_state_start == "Bottle in mouth",
+         happened_in_cluster == 1) %>% 
+  mutate(bottle_removed = if_else(!is.na(bottle_state_changed), 1, 0)) %>% 
+  group_by(behavior) %>% 
+  summarize(proportion_removed = mean(bottle_removed)) %>% 
+  ggplot(aes(y = behavior, x = proportion_removed)) +
+  geom_bar(stat = "identity")
+  
+
+```
 
 
