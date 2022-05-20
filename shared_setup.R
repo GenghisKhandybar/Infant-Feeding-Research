@@ -162,6 +162,10 @@ mom_behaviors <- data_duration %>%
 
 bottle_states <- state_behaviors[grep("Bottle", state_behaviors)]
 
+# Behavior Clusters
+df_behavior_clusters <- read_csv("df_behavior_clusters.csv")
+
+
 # Dyad set counts (depending on whether bottle rejectors are included) -------------------------------
 
 dyad_set_counts <- data_duration %>% 
