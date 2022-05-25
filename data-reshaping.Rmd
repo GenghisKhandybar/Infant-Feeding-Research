@@ -791,7 +791,9 @@ data_onehot <- data_onehot %>%
   group_by(id, dyad_set, Time_Relative_sf) %>% 
   summarise(starting_bottle_state = first(previous_bottle_state),
             ending_bottle_state = last(bottle_state),
-            across(where(is.numeric), ~ sum(.x))) %>% 
+            across(where(is.numeric), ~ sum(.x)),
+            # If there are multiple lines, Behavior is "Multiple Behaviors". Otherwise, it's the one behavior at that time.
+            current_behavior = if_else(n()>1, "Multiple Behaviors", first(Software_Behavior))) %>% 
   # If the bottle changed during this time point, this variable notes it.
   # Uses NA_character_ to make null rows if no change happened.
   mutate(changed_bottle_state = if_else(starting_bottle_state == ending_bottle_state, NA_character_, ending_bottle_state))
@@ -850,6 +852,7 @@ df_cluster_times <- df_clusters %>%
   summarize(start_time = min(Time_Relative_sf),
             end_time = max(Time_Relative_sf),
             cluster_time = end_time - start_time,
+            first_behavior = first(current_behavior),
             bottle_state_start = first(starting_bottle_state),
             bottle_state_changed = first(na.omit(changed_bottle_state)), # this will be NA unless the bottle state changed
             across(onehot_behavior_columns, sum), # For each of the behavior columns, its new value is the sum over the group.
